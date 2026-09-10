@@ -1,0 +1,13 @@
+{
+  "name": "proplet-pixel-studio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "check": "node --check preview-sizing.js && node --check test/preview-sizing.test.js && node scripts/check.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@babel/core": "7.28.4",
+    "@babel/preset-react": "7.27.1"
+  }
+}

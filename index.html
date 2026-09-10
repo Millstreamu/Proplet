@@ -36,6 +36,7 @@ input{font-family:inherit}
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="preview-sizing.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -365,6 +366,23 @@ class Component extends React.Component {
     if (grid && cell >= 7) this.gridLines(c, W, H, cell, 0, 0);
   }
 
+  /* Preview canvases keep a native-resolution backing store and are fitted
+     independently in CSS. Unlike the editor zoom, this intentionally permits
+     fractional display scaling for sprites larger than their preview box. */
+  drawPreview(cv, px, W, H, box){
+    if (!cv) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const backingW = Math.max(1, Math.round(W * dpr));
+    const backingH = Math.max(1, Math.round(H * dpr));
+    const fitted = PixelStudioPreview.fitDimensions(box, W, H);
+    cv.width = backingW; cv.height = backingH;
+    cv.style.width = fitted.width + 'px'; cv.style.height = fitted.height + 'px';
+    const c = cv.getContext('2d');
+    c.setTransform(backingW / W, 0, 0, backingH / H, 0, 0);
+    c.clearRect(0, 0, W, H);
+    this.blit(c, px, W, H, 1, 0, 0, null, null);
+  }
+
   gridLines(c, W, H, cell, ox, oy){
     c.lineWidth = 1;
     c.strokeStyle = 'rgba(236,231,222,.08)';
@@ -486,22 +504,21 @@ class Component extends React.Component {
   paint(){
     const s = this.state;
     const { frames, active, playing, previewIdx } = s;
-    const cellIn = (box, W, H) => Math.max(1, Math.floor(box / Math.max(W, H)));
     this.paintMain();
     if (s.workspace === 'tiles'){
       this.paintTileRepeat();
-      s.tiles.forEach(t => { const el = this.thumbs[t.id]; if (el) this.draw(el, t.px, s.w, s.h, cellIn(66, s.w, s.h), false, false); });
+      s.tiles.forEach(t => { const el = this.thumbs[t.id]; if (el) this.drawPreview(el, t.px, s.w, s.h, 66); });
     } else if (s.workspace === 'atlas'){
       const a = s.atlas[s.activeAtlas];
-      if (a) this.draw(this.previewRef.current, a.px, a.w, a.h, cellIn(88, a.w, a.h), false, false);
+      if (a) this.drawPreview(this.previewRef.current, a.px, a.w, a.h, 88);
       else { const cv = this.previewRef.current; if (cv){ cv.width = cv.height = 1; cv.style.width = cv.style.height = '0px'; } }
-      s.atlas.forEach(it => { const el = this.thumbs[it.id]; if (el) this.draw(el, it.px, it.w, it.h, cellIn(66, it.w, it.h), false, false); });
+      s.atlas.forEach(it => { const el = this.thumbs[it.id]; if (el) this.drawPreview(el, it.px, it.w, it.h, 66); });
     } else {
       const pf = frames[(playing ? previewIdx : active) % frames.length];
-      this.draw(this.previewRef.current, pf.px, s.w, s.h, cellIn(88, s.w, s.h), false, false);
-      frames.forEach(f => { const el = this.thumbs[f.id]; if (el) this.draw(el, f.px, s.w, s.h, cellIn(66, s.w, s.h), false, false); });
+      this.drawPreview(this.previewRef.current, pf.px, s.w, s.h, 88);
+      frames.forEach(f => { const el = this.thumbs[f.id]; if (el) this.drawPreview(el, f.px, s.w, s.h, 66); });
     }
-    if (s.tfx != null && frames[s.tfx]) this.draw(this.tfxRef.current, frames[s.tfx].px, s.w, s.h, cellIn(96, s.w, s.h), false, false);
+    if (s.tfx != null && frames[s.tfx]) this.drawPreview(this.tfxRef.current, frames[s.tfx].px, s.w, s.h, 96);
     if (s.sheetOpen) this.paintSheet();
     if (s.tileSheetOpen) this.paintTileSheet();
     if (s.atlasSheetOpen) this.paintAtlasSheet();
@@ -2606,7 +2623,7 @@ class Component extends React.Component {
                 <Hov key={i} tag="div" draggable="true" onDragStart={fr.dragStart} onDragOver={fr.dragOver} onDrop={fr.drop} onClick={fr.pick} onDoubleClick={fr.dup} onContextMenu={fr.menu} title={fr.title} s="position:relative;flex:none;width:86px;padding:6px 6px 5px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);cursor:pointer" sh="border-color:rgba(236,231,222,.34)">
                   {fr.on && <span style={css("position:absolute;inset:0;border:1px solid var(--gold);border-radius:4px;background:rgba(225,173,102,.09);pointer-events:none")}></span>}
                   {fr.hasTag && <span style={{...css("position:absolute;left:6px;right:6px;top:2px;height:2px;border-radius:1px;pointer-events:none"), background:fr.tagColor}}></span>}
-                  <div style={css("position:relative;display:flex;justify-content:center;background:var(--bg0);border:1px solid rgba(236,231,222,.08)")}>
+                  <div data-preview-box="66" style={css("position:relative;width:66px;height:66px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg0);border:1px solid rgba(236,231,222,.08)")}>
                     <canvas ref={fr.ref} style={css("display:block;image-rendering:pixelated")}></canvas>
                   </div>
                   <div style={css("position:relative;display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:5px")}>
@@ -2655,7 +2672,7 @@ class Component extends React.Component {
                 <Hov onClick={R.closeTfx} s="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sh="color:var(--fg)"><svg width="14" height="14" viewBox="0 0 24 24" className="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></Hov>
               </div>
               <div style={css("display:flex;gap:16px;padding:18px")}>
-                <div style={css("width:104px;height:104px;flex:none;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;background:var(--bg0)")}>
+                <div style={css("width:104px;height:104px;overflow:hidden;flex:none;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;background:var(--bg0)")}>
                   <canvas ref={R.tfxRef} style={css("display:block;image-rendering:pixelated")}></canvas>
                 </div>
                 <div style={css("flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:5px")}>
