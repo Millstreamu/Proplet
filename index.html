@@ -38,6 +38,7 @@ input{font-family:inherit}
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
 <script src="preview-sizing.js"></script>
 <script src="selection-model.js"></script>
+<script src="line-model.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -124,6 +125,7 @@ const IC = {
   onion:['m12 2 9 5-9 5-9-5z','m21 12-9 5-9-5','m21 17-9 5-9-5'],
   wrap:['M17 2l4 4-4 4','M3 11v-1a4 4 0 0 1 4-4h14','M7 22l-4-4 4-4','M21 13v1a4 4 0 0 1-4 4H3'],
   rect:['M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z'],
+  line:['M4 20 20 4'],
   ellipse:['M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18z'],
   tint:['M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z']
 };
@@ -132,6 +134,7 @@ const TOOLS = [
   {id:'eraser', name:'Eraser', key:'E', paths:IC.eraser},
   {id:'picker', name:'Eyedropper', key:'I', paths:IC.picker},
   {id:'fill', name:'Fill bucket', key:'F', paths:IC.fill},
+  {id:'line', name:'Line', key:'N', paths:IC.line, hint:'Line — drag between endpoints · Shift = horizontal, vertical, or 45°'},
   {id:'rect', name:'Rectangle', key:'R', paths:IC.rect, hint:'Rectangle — drag to draw · Shift = square · Alt = filled'},
   {id:'ellipse', name:'Ellipse', key:'C', paths:IC.ellipse, hint:'Ellipse — drag to draw · Shift = circle · Alt = filled'},
   {id:'lighten', name:'Lighten', key:'L', paths:IC.lighten, circle:true},
@@ -743,7 +746,7 @@ class Component extends React.Component {
       this.drawing = true;
       return;
     }
-    if (s.tool === 'rect' || s.tool === 'ellipse'){
+    if (s.tool === 'line' || s.tool === 'rect' || s.tool === 'ellipse'){
       this.snap();
       this.shapeBase = this.curPx().slice();
       this.shapeAnchor = p;
@@ -788,7 +791,7 @@ class Component extends React.Component {
       }
       return;
     }
-    if (this.state.tool === 'rect' || this.state.tool === 'ellipse'){
+    if (this.state.tool === 'line' || this.state.tool === 'rect' || this.state.tool === 'ellipse'){
       this.drawShape(this.shapeAnchor, p, e);
       this.last = p; this.touch();
       return;
@@ -818,6 +821,11 @@ class Component extends React.Component {
     const d = this.dims(), W = d.w, H = d.h, fg = this.state.fg;
     const plot = (x,y) => { this.mirrorPts(x,y).forEach(([mx,my]) => { if (mx>=0 && mx<W && my>=0 && my<H) px[my*W+mx] = fg; }); };
     let x0=a.x, y0=a.y, x1=b.x, y1=b.y;
+    if (this.state.tool === 'line'){
+      const end = e && e.shiftKey ? PixelStudioLine.snapEndpoint(a, b) : b;
+      PixelStudioLine.rasterize(a, end).forEach(({x,y}) => plot(x,y));
+      return;
+    }
     if (e && e.shiftKey){
       const sz = Math.max(Math.abs(x1-x0), Math.abs(y1-y0));
       x1 = x0 + (x1<x0 ? -sz : sz);
@@ -981,7 +989,7 @@ class Component extends React.Component {
       if (k==='arrowleft') this.setState(s=>({active:(s.active-1+s.frames.length)%s.frames.length}));
       return;
     }
-    const map = { p:'pencil', e:'eraser', i:'picker', f:'fill', r:'rect', c:'ellipse', l:'lighten', d:'darken', x:'tint', m:'move', s:'select' };
+    const map = { p:'pencil', e:'eraser', i:'picker', f:'fill', n:'line', r:'rect', c:'ellipse', l:'lighten', d:'darken', x:'tint', m:'move', s:'select' };
     if (map[k]){ const tl = TOOLS.find(x=>x.id===map[k]); this.commitFloatingSelection(); this.setState({tool:map[k], hint:tl.hint||tl.name}); }
     else if (k==='g') this.setState(v=>({grid:!v.grid}));
     else if (k==='t') this.setState(v=>({tile:!v.tile}), ()=>this.fit());
