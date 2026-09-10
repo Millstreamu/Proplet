@@ -37,6 +37,7 @@ input{font-family:inherit}
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
 <script src="preview-sizing.js"></script>
+<script src="canvas-background.js"></script>
 <script src="selection-model.js"></script>
 <script src="line-model.js"></script>
 <script src="paint-model.js"></script>
@@ -218,7 +219,7 @@ class Component extends React.Component {
       fg:'#c2417a', bg:'#15130f', palette:PALETTE.slice(), recent:['#c2417a','#f07fae','#6fb0c9','#a8763f'],
       ramps:RAMPS.map(r=>({...r, colors:r.colors.slice()})),
       shadeMode: p.shadeModeDefault === 'Basic RGB' ? 'rgb' : 'ramp', paintMode:'solid',
-      cell:15, grid:p.showGridDefault !== false, tile:!!p.tileDefault,
+      cell:15, grid:p.showGridDefault !== false, tile:!!p.tileDefault, viewBackground:'checker',
       mirrorH:false, mirrorV:false, shapeFill:false,
       onion:{ on:!!p.onionDefault, prev:1, next:1, opacity:p.onionOpacityDefault || 35 },
       selRect:null, clip:null,
@@ -429,10 +430,16 @@ class Component extends React.Component {
     c.setTransform(dpr,0,0,dpr,0,0);
     c.clearRect(0,0,cw,ch);
 
-    const q = Math.max(4, cell);
-    for (let y=0;y<ch;y+=q) for (let x=0;x<cw;x+=q){
-      c.fillStyle = ((x/q + y/q) % 2 === 0) ? '#242019' : '#1b1814';
-      c.fillRect(x,y,q,q);
+    const backgroundFill = PixelStudioBackground.fillFor(s.viewBackground);
+    if (backgroundFill){
+      c.fillStyle = backgroundFill;
+      c.fillRect(0,0,cw,ch);
+    } else {
+      const q = Math.max(4, cell);
+      for (let y=0;y<ch;y+=q) for (let x=0;x<cw;x+=q){
+        c.fillStyle = ((x/q + y/q) % 2 === 0) ? '#242019' : '#1b1814';
+        c.fillRect(x,y,q,q);
+      }
     }
 
     if (s.workspace === 'atlas' && !s.atlas.length) return;
@@ -2061,6 +2068,11 @@ class Component extends React.Component {
         { label:'Onion', tip:'Onion skin — O', on:s.onion.on, icon:mkIcon(IC.onion, false, 14), click:()=>this.setState(v=>({onion:{...v.onion, on:!v.onion.on}})) },
         { label:'Wrap', tip:'Wrap drawing across the tile edges — W', on:s.wrap, icon:mkIcon(IC.wrap, false, 14), click:()=>this.setState(v=>({wrap:!v.wrap, hint:v.wrap?'Wrap drawing off':'Wrap drawing on — paint past an edge and it wraps'})) }
       ],
+      viewBackgrounds: [['checker','Check'],['white','White'],['black','Black']].map(([id,label]) => ({
+        label, on:s.viewBackground===id,
+        tip:(id==='checker' ? 'Transparency checker' : label+' canvas')+' — temporary viewing background only',
+        pick:()=>this.setState({viewBackground:id, hint:label+' canvas background (view only)'})
+      })),
 
       shadeModes: [['ramp','Palette ramp','Lighten and darken step along a ramp'],['rgb','Basic RGB','Lighten and darken shift the raw colour']].map(([id,label,tip]) => ({
         label, tip, on:s.shadeMode===id, pick:()=>this.setState({shadeMode:id, hint:'Shading: '+label})
@@ -2370,6 +2382,18 @@ class Component extends React.Component {
           <main style={css("position:relative;display:flex;align-items:safe center;justify-content:safe center;min-width:0;min-height:0;overflow:auto;background:var(--bg0);background-image:radial-gradient(circle at 50% 40%, rgba(225,173,102,.05), transparent 60%)")}>
             <div style={css("padding:22px")}>
               <canvas ref={R.mainRef} onPointerDown={R.onDown} onPointerMove={R.onMove} onPointerUp={R.onUp} onPointerLeave={R.onLeave} style={{...css("display:block;image-rendering:pixelated;touch-action:none;box-shadow:0 0 0 1px rgba(236,231,222,.18), 0 18px 44px rgba(0,0,0,.55)"), cursor:R.mainCursor}}></canvas>
+            </div>
+
+            <div style={css("position:absolute;right:14px;top:12px;display:flex;align-items:center;gap:7px;padding:4px 5px 4px 9px;background:rgba(21,19,15,.9);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(3px);white-space:nowrap")} title="Canvas background (view only)">
+              <span style={css("font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)")}>Canvas</span>
+              <div style={css("display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden")}>
+                {R.viewBackgrounds.map(bg=>(
+                  <Hov key={bg.label} onClick={bg.pick} title={bg.tip} s="position:relative;padding:4px 8px;background:transparent;border:0;border-left:1px solid var(--line);font-size:10px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
+                    {bg.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                    <span style={css("position:relative")}>{bg.label}</span>
+                  </Hov>
+                ))}
+              </div>
             </div>
 
             {R.hasSel && (
