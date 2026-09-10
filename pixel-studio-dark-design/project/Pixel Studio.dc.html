@@ -1,0 +1,2262 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_ds/classical-c9d810d5-c452-48da-bf91-db2ffef7f0f6/styles.css">
+<script src="_ds/classical-c9d810d5-c452-48da-bf91-db2ffef7f0f6/_ds_bundle.js"></script>
+<style>
+:root{
+  --color-bg:#15130f; --color-surface:#232019; --color-text:#ece7de;
+  --color-accent:#e1ad66; --color-accent-2:#e1ad66;
+  --color-divider:rgba(236,231,222,.15);
+  --gold:#e1ad66; --bg0:#15130f; --bg1:#1c1915; --bg2:#232019; --bg3:#2b2721;
+  --line:rgba(236,231,222,.13); --fg:#ece7de; --dim:rgba(236,231,222,.52);
+}
+html,body{margin:0;height:100%;background:var(--bg0);color:var(--fg);font-family:"Lora",Georgia,serif;overflow:auto}
+*{box-sizing:border-box}
+a{color:var(--gold);text-decoration:none}
+a:hover{color:#f2d9a0}
+button{font-family:inherit;color:inherit}
+input{font-family:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+::selection{background:rgba(225,173,102,.28)}
+.ic{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block}
+</style>
+</helmet>
+<div style="height:100vh;min-height:660px;min-width:1180px;display:grid;grid-template-rows:auto auto 1fr auto auto;background:var(--bg0)">
+
+  <header style="display:flex;align-items:center;gap:16px;height:50px;padding:0 14px;background:var(--bg1);border-bottom:1px solid var(--line)">
+    <div style="display:flex;align-items:baseline;gap:9px;padding-right:15px;border-right:1px solid var(--line);line-height:1;flex:none;white-space:nowrap">
+      <span style="font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:.01em;color:var(--fg)">Pixel Studio</span>
+      <span style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)">Sprite Ed.</span>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:2px;flex:none">
+      <button title="Undo — Ctrl/Cmd + Z" onClick="{{ undo }}" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="background:rgba(236,231,222,.07);color:var(--fg)"><svg width="17" height="17" viewBox="0 0 24 24" class="ic"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg></button>
+      <button title="Redo — Ctrl/Cmd + Shift + Z" onClick="{{ redo }}" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="background:rgba(236,231,222,.07);color:var(--fg)"><svg width="17" height="17" viewBox="0 0 24 24" class="ic"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg></button>
+    </div>
+
+    <div style="width:1px;height:24px;background:var(--line);flex:none"></div>
+
+    <div style="display:flex;align-items:center;gap:2px;flex:none;white-space:nowrap">
+      <button title="Project actions — new, open, save, import, export" onClick="{{ openFileMenu }}" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px;color:var(--dim)" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>File<span style="font-size:9px;opacity:.7">▾</span></button>
+      <button title="Save project — Ctrl/Cmd + S" onClick="{{ quickSave }}" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px;color:var(--dim)" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path></svg>Save</button>
+      <button title="Clear the current frame or tile" onClick="{{ clearCanvas }}" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px;color:var(--dim)" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg>Clear</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:1px;padding:0 13px;border-left:1px solid var(--line);flex:none;white-space:nowrap;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--fg);letter-spacing:.02em">
+        <span style="overflow:hidden;text-overflow:ellipsis;max-width:190px">{{ projName }}</span>
+        <sc-if value="{{ isDirty }}" hint-placeholder-val="{{ true }}"><span title="Unsaved changes in the project file" style="color:var(--gold);font-size:14px;line-height:1">*</span></sc-if>
+      </div>
+      <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)">{{ fileSavedText }}</div>
+    </div>
+
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex:none;white-space:nowrap">
+      <span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-variant-numeric:tabular-nums">{{ frameCount }} frames · {{ totalMs }}</span>
+      <button onClick="{{ openTileSheet }}" style="display:flex;align-items:center;gap:7px;padding:7px 11px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px;color:var(--dim)" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M3 3h7v7H3z"></path><path d="M14 3h7v7h-7z"></path><path d="M3 14h7v7H3z"></path><path d="M14 14h7v7h-7z"></path></svg>Tile Set</button>
+      <button onClick="{{ openSheet }}" class="btn btn-primary" style="gap:8px"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><rect x="3" y="3" width="18" height="18" rx="1"></rect><path d="M9 3v18"></path><path d="M15 3v18"></path><path d="M3 9h18"></path><path d="M3 15h18"></path></svg>Sprite Sheet</button>
+    </div>
+  </header>
+
+  <div style="display:flex;align-items:center;gap:14px;height:38px;padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:3px;flex:none">
+      <sc-for list="{{ viewToggles }}" as="v" hint-placeholder-count="5">
+        <button onClick="{{ v.click }}" title="{{ v.tip }}" style="position:relative;display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:11px;letter-spacing:.05em;color:var(--dim);white-space:nowrap" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)">
+          <sc-if value="{{ v.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px"></span></sc-if>
+          <span style="position:relative;display:block">{{ v.icon }}</span>
+          <span style="position:relative">{{ v.label }}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="width:1px;height:20px;background:var(--line);flex:none"></div>
+
+    <div style="display:flex;align-items:center;gap:7px;flex:none;white-space:nowrap">
+      <span style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Size</span>
+      <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+        <sc-for list="{{ sizes }}" as="sz" hint-placeholder-count="4">
+          <button onClick="{{ sz.pick }}" title="{{ sz.title }}" style="position:relative;padding:4px 8px;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;letter-spacing:.05em;font-variant-numeric:tabular-nums;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+            <sc-if value="{{ sz.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+            <span style="position:relative">{{ sz.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:2px;flex:none;border:1px solid var(--line);border-radius:4px;padding:1px">
+      <button title="Zoom out" onClick="{{ zoomOut }}" style="width:24px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:3px;cursor:pointer;color:var(--dim)" style-hover="color:var(--fg);background:rgba(236,231,222,.08)"><svg width="14" height="14" viewBox="0 0 24 24" class="ic"><path d="M5 12h14"></path></svg></button>
+      <span style="min-width:52px;text-align:center;font-size:11px;color:var(--fg);font-variant-numeric:tabular-nums">{{ zoomText }}</span>
+      <button title="Zoom in" onClick="{{ zoomIn }}" style="width:24px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:3px;cursor:pointer;color:var(--dim)" style-hover="color:var(--fg);background:rgba(236,231,222,.08)"><svg width="14" height="14" viewBox="0 0 24 24" class="ic"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></button>
+      <button title="Fit to view" onClick="{{ zoomFit }}" style="padding:0 8px;height:22px;background:transparent;border:0;border-left:1px solid var(--line);cursor:pointer;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase" style-hover="color:var(--gold)">Fit</button>
+    </div>
+
+    <div style="margin-left:auto;display:flex;align-items:center;gap:9px;flex:none;white-space:nowrap">
+      <span style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Shading</span>
+      <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+        <sc-for list="{{ shadeModes }}" as="m" hint-placeholder-count="2">
+          <button onClick="{{ m.pick }}" title="{{ m.tip }}" style="position:relative;padding:4px 10px;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+            <sc-if value="{{ m.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+            <span style="position:relative">{{ m.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:auto 1fr auto;min-height:0">
+
+    <nav style="display:flex;flex-direction:column;gap:3px;padding:9px 7px;background:var(--bg1);border-right:1px solid var(--line)">
+      <sc-for list="{{ tools }}" as="t" hint-placeholder-count="8">
+        <button title="{{ t.tip }}" onClick="{{ t.pick }}" onMouseEnter="{{ t.hover }}" onMouseLeave="{{ clearHint }}" style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--dim);cursor:pointer" style-hover="background:rgba(236,231,222,.07);color:var(--fg)">
+          <sc-if value="{{ t.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px"></span></sc-if>
+          <span style="position:relative;display:block">{{ t.icon }}</span>
+        </button>
+      </sc-for>
+    </nav>
+
+    <main style="position:relative;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:auto;background:var(--bg0);background-image:radial-gradient(circle at 50% 40%, rgba(225,173,102,.05), transparent 60%)">
+      <div style="padding:22px">
+        <canvas ref="{{ mainRef }}" onPointerDown="{{ onDown }}" onPointerMove="{{ onMove }}" onPointerUp="{{ onUp }}" onPointerLeave="{{ onLeave }}" style="display:block;image-rendering:pixelated;touch-action:none;cursor:crosshair;box-shadow:0 0 0 1px rgba(236,231,222,.18), 0 18px 44px rgba(0,0,0,.55)"></canvas>
+      </div>
+
+      <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:2px;padding:4px;background:rgba(21,19,15,.9);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(3px)">
+          <span style="padding:0 8px 0 4px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);white-space:nowrap">{{ selText }}</span>
+          <sc-for list="{{ selActions }}" as="a" hint-placeholder-count="8">
+            <button onClick="{{ a.click }}" title="{{ a.tip }}" style="height:24px;padding:0 8px;background:transparent;border:1px solid transparent;border-radius:3px;cursor:pointer;color:var(--dim);font-size:11px;white-space:nowrap" style-hover="color:var(--fg);background:rgba(236,231,222,.09)">{{ a.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ tileOn }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;right:14px;bottom:12px;padding:5px 10px;background:rgba(21,19,15,.85);border:1px solid var(--line);border-radius:4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)">Tile mode · centre tile is editable</div>
+      </sc-if>
+    </main>
+
+    <aside style="width:270px;display:flex;flex-direction:column;background:var(--bg1);border-left:1px solid var(--line);overflow-y:auto">
+
+      <section style="padding:13px 14px;border-bottom:1px solid var(--line)">
+        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:11px">Colour</div>
+        <div style="display:flex;gap:11px;align-items:flex-start">
+          <div style="position:relative;width:76px;height:62px;flex:none">
+            <div style="position:absolute;right:0;bottom:0;width:42px;height:38px;border:1px solid var(--line);background:{{ bgColor }}"></div>
+            <label style="position:absolute;left:0;top:0;width:50px;height:46px;border:1px solid rgba(236,231,222,.35);cursor:pointer;background:{{ fgColor }}" title="Foreground colour — click to pick">
+              <input type="color" value="{{ fgColor }}" onInput="{{ setFg }}" style="opacity:0;width:100%;height:100%;cursor:pointer;display:block">
+            </label>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:4px;padding:5px 8px">
+              <span style="font-size:12px;color:var(--dim)">#</span>
+              <input value="{{ hexText }}" onChange="{{ setHex }}" style="flex:1;min-width:0;background:transparent;border:0;color:var(--fg);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-variant-numeric:tabular-nums;outline:none">
+            </div>
+            <button onClick="{{ swapColors }}" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:5px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11px;cursor:pointer" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="13" height="13" viewBox="0 0 24 24" class="ic"><path d="M16 3l4 4-4 4"></path><path d="M20 7H4"></path><path d="M8 21l-4-4 4-4"></path><path d="M4 17h16"></path></svg>Swap</button>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding:13px 14px;border-bottom:1px solid var(--line)">
+        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:9px">Recent</div>
+        <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px">
+          <sc-for list="{{ recents }}" as="r" hint-placeholder-count="6">
+            <button onClick="{{ r.pick }}" title="{{ r.title }}" style="position:relative;aspect-ratio:1;border:1px solid rgba(0,0,0,.45);border-radius:2px;cursor:pointer;padding:0;background:{{ r.color }}"></button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ noRecents }}" hint-placeholder-val="{{ false }}"><div style="font-size:10px;color:var(--dim);font-style:italic">Colours you paint with collect here.</div></sc-if>
+      </section>
+
+      <section style="padding:13px 14px;border-bottom:1px solid var(--line)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)">Palette</span>
+          <button onClick="{{ addSwatch }}" title="Add current colour to the palette" style="display:flex;align-items:center;gap:5px;background:transparent;border:0;color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:0" style-hover="color:var(--gold)"><svg width="12" height="12" viewBox="0 0 24 24" class="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Add</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px">
+          <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="20">
+            <button onClick="{{ s.pick }}" onContextMenu="{{ s.remove }}" title="{{ s.title }}" style="position:relative;aspect-ratio:1;border:1px solid rgba(0,0,0,.4);border-radius:2px;cursor:pointer;padding:0;background:{{ s.color }}">
+              <sc-if value="{{ s.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-3px;border:1px solid var(--gold);border-radius:3px"></span></sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="padding:13px 14px;border-bottom:1px solid var(--line)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)">Palette ramps</span>
+          <button onClick="{{ addRamp }}" title="Start a new ramp from the current colour" style="background:transparent;border:0;color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:0" style-hover="color:var(--gold)">New ramp</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">
+          <span>Shadow</span><span>Mid</span><span>Base</span><span style="text-align:right">Light</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ ramps }}" as="rp" hint-placeholder-count="3">
+            <div>
+              <div style="display:flex;align-items:center;gap:5px">
+                <sc-for list="{{ rp.stops }}" as="st" hint-placeholder-count="5">
+                  <button onClick="{{ st.pick }}" onContextMenu="{{ st.remove }}" title="{{ st.title }}" draggable="true" onDragStart="{{ st.dragStart }}" onDragOver="{{ st.dragOver }}" onDrop="{{ st.drop }}" style="position:relative;flex:1;height:22px;border:1px solid rgba(0,0,0,.45);border-radius:2px;cursor:pointer;padding:0;background:{{ st.color }}">
+                    <sc-if value="{{ st.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-3px;border:1px solid var(--gold);border-radius:3px"></span></sc-if>
+                  </button>
+                </sc-for>
+                <button onClick="{{ rp.add }}" title="Append the current colour to this ramp" style="width:20px;height:22px;flex:none;background:transparent;border:1px dashed var(--line);border-radius:2px;color:var(--dim);font-size:12px;line-height:1;cursor:pointer;padding:0" style-hover="color:var(--gold);border-color:var(--gold)">+</button>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                <span style="font-size:10px;color:var(--dim);font-style:italic">{{ rp.name }}</span>
+                <button onClick="{{ rp.remove }}" title="Delete this ramp" style="background:transparent;border:0;color:var(--dim);font-size:9px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:0" style-hover="color:#e0836d">Remove</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top:9px;font-size:10px;color:var(--dim);font-style:italic">Lighten steps right along a ramp, Darken steps left. Drag stops to reorder; right-click to remove.</div>
+      </section>
+
+      <section style="padding:13px 14px;border-bottom:1px solid var(--line)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)">Onion skin</span>
+          <button onClick="{{ toggleOnion }}" style="position:relative;padding:3px 9px;background:transparent;border:1px solid var(--line);border-radius:3px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+            <sc-if value="{{ onionOn }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:3px"></span></sc-if>
+            <span style="position:relative">{{ onionLabel }}</span>
+          </button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)"><span style="width:9px;height:9px;background:#c2417a;border-radius:1px"></span>Previous frames</span>
+            <div style="display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden">
+              <sc-for list="{{ prevOpts }}" as="o" hint-placeholder-count="3">
+                <button onClick="{{ o.pick }}" style="position:relative;width:24px;padding:3px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums" style-hover="color:var(--fg)">
+                  <sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                  <span style="position:relative">{{ o.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)"><span style="width:9px;height:9px;background:#6fb0c9;border-radius:1px"></span>Next frames</span>
+            <div style="display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden">
+              <sc-for list="{{ nextOpts }}" as="o" hint-placeholder-count="3">
+                <button onClick="{{ o.pick }}" style="position:relative;width:24px;padding:3px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums" style-hover="color:var(--fg)">
+                  <sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                  <span style="position:relative">{{ o.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="font-size:11px;color:var(--dim)">Opacity</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="range" min="10" max="70" step="5" value="{{ onionOpacity }}" onInput="{{ setOnionOpacity }}" style="width:100px;accent-color:var(--gold)">
+              <span style="width:30px;font-size:11px;font-variant-numeric:tabular-nums">{{ onionOpacity }}%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding:13px 14px;border-bottom:1px solid var(--line)">
+        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:11px">Preview</div>
+        <div style="display:flex;gap:13px;align-items:center">
+          <div style="width:96px;height:96px;flex:none;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;background:var(--bg0);overflow:hidden">
+            <canvas ref="{{ previewRef }}" style="display:block;image-rendering:pixelated"></canvas>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+            <sc-if value="{{ isFrames }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <button onClick="{{ togglePlay }}" title="Play the active animation — Space" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:7px;background:transparent;border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:12px;cursor:pointer" style-hover="background:rgba(225,173,102,.13)">{{ playIcon }}{{ playLabel }}</button>
+                <div style="font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">Set all frames</div>
+                <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+                  <sc-for list="{{ durPresets }}" as="d" hint-placeholder-count="4">
+                    <button onClick="{{ d.pick }}" title="{{ d.title }}" style="position:relative;flex:1;padding:5px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:10px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums" style-hover="color:var(--fg)"><span style="position:relative">{{ d.label }}</span></button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isTiles }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="font-size:11px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tileName }}</div>
+                <div style="font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">Repeat preview</div>
+                <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+                  <sc-for list="{{ previewSizes }}" as="p" hint-placeholder-count="3">
+                    <button onClick="{{ p.pick }}" style="position:relative;flex:1;padding:5px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:10px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums" style-hover="color:var(--fg)">
+                      <sc-if value="{{ p.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                      <span style="position:relative">{{ p.label }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+                <button onClick="{{ openTileSheet }}" style="padding:6px;background:transparent;border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:11px;cursor:pointer" style-hover="background:rgba(225,173,102,.13)">Export tile set…</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding:13px 14px">
+        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:10px">Shortcuts</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px;color:var(--dim)">
+          <span style="color:var(--fg);letter-spacing:.1em">P E I F</span><span>Pencil · Eraser · Pick · Fill</span>
+          <span style="color:var(--fg);letter-spacing:.1em">L D M S</span><span>Lighten · Darken · Move · Select</span>
+          <span style="color:var(--fg);letter-spacing:.1em">G T O</span><span>Grid · Tile · Onion</span>
+          <span style="color:var(--fg);letter-spacing:.1em">H V</span><span>Mirror horizontal · vertical</span>
+          <span style="color:var(--fg);letter-spacing:.1em">↑↓←→</span><span>Nudge selection</span>
+          <span style="color:var(--fg);letter-spacing:.1em">⌘C ⌘X ⌘V</span><span>Copy · Cut · Paste</span>
+          <span style="color:var(--fg);letter-spacing:.1em">⌘Z ⇧⌘Z</span><span>Undo · Redo</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <section style="background:var(--bg1);border-top:1px solid var(--line);padding:9px 14px;display:flex;align-items:stretch;gap:13px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:7px;flex:none;width:150px">
+      <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+        <sc-for list="{{ workspaces }}" as="w" hint-placeholder-count="2">
+          <button onClick="{{ w.pick }}" title="{{ w.tip }}" style="position:relative;flex:1;padding:5px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+            <sc-if value="{{ w.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+            <span style="position:relative">{{ w.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ isTiles }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;gap:3px">
+            <button title="New tile" onClick="{{ addTile }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></button>
+            <button title="Duplicate tile" onClick="{{ dupTileBtn }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="12" height="12" rx="1"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg></button>
+            <button title="Rename tile" onClick="{{ renameTileBtn }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L7.5 19.5 3 21l1.5-4.5z"></path></svg></button>
+            <button title="Delete tile" onClick="{{ delTileBtn }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:#e0836d;border-color:#e0836d"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></button>
+          </div>
+          <div style="font-size:10px;color:var(--dim);font-style:italic">{{ tileCountText }} · {{ dimText }}</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isFrames }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;gap:3px">
+        <button title="Add empty frame" onClick="{{ addFrame }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></button>
+        <button title="Duplicate frame" onClick="{{ dupFrame }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="12" height="12" rx="1"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg></button>
+        <button title="Duplicate + transform" onClick="{{ dupTransform }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><rect x="3" y="3" width="8" height="8" rx="1"></rect><path d="M14 7h5a2 2 0 0 1 2 2v5"></path><path d="M18 17l3-3-3-3"></path><path d="M13 13h8v8h-8z"></path></svg></button>
+        <button title="Delete frame" onClick="{{ delFrame }}" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" style-hover="color:#e0836d;border-color:#e0836d"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);white-space:nowrap">Hold</span>
+        <div style="display:flex;align-items:center;border:1px solid var(--line);border-radius:4px;overflow:hidden;flex:1">
+          <button onClick="{{ durDown }}" title="Shorter by 20 ms" style="width:20px;height:22px;background:transparent;border:0;color:var(--dim);font-size:12px;cursor:pointer;padding:0" style-hover="color:var(--gold)">–</button>
+          <input value="{{ activeDur }}" onChange="{{ setDur }}" title="Duration of the current frame in milliseconds" style="flex:1;min-width:0;background:transparent;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);color:var(--fg);font-size:11px;text-align:center;font-variant-numeric:tabular-nums;outline:none;height:22px">
+          <button onClick="{{ durUp }}" title="Longer by 20 ms" style="width:20px;height:22px;background:transparent;border:0;color:var(--dim);font-size:12px;cursor:pointer;padding:0" style-hover="color:var(--gold)">+</button>
+        </div>
+        <span style="font-size:10px;color:var(--dim)">ms</span>
+      </div>
+      </div>
+      </sc-if>
+    </div>
+    <div style="width:1px;align-self:stretch;background:var(--line)"></div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;min-height:0">
+
+      <sc-if value="{{ isFrames }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;gap:6px;min-height:24px;flex-wrap:nowrap;overflow-x:auto">
+          <span style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);flex:none">Tags</span>
+          <sc-for list="{{ tagChips }}" as="tg" hint-placeholder-count="3">
+            <button onClick="{{ tg.pick }}" onContextMenu="{{ tg.menu }}" title="{{ tg.title }}" style="position:relative;flex:none;display:flex;align-items:center;gap:7px;height:23px;padding:0 9px;background:transparent;border:1px solid var(--line);border-radius:3px;cursor:pointer;font-size:11px;color:var(--dim);white-space:nowrap" style-hover="color:var(--fg);border-color:rgba(236,231,222,.34)">
+              <sc-if value="{{ tg.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.13);border-radius:3px"></span></sc-if>
+              <span style="position:relative;width:7px;height:7px;border-radius:1px;flex:none;background:{{ tg.color }}"></span>
+              <span style="position:relative;color:var(--fg)">{{ tg.name }}</span>
+              <span style="position:relative;font-variant-numeric:tabular-nums">{{ tg.range }}</span>
+              <span style="position:relative;font-size:9px;letter-spacing:.12em;text-transform:uppercase;opacity:.7">{{ tg.mode }}</span>
+            </button>
+          </sc-for>
+          <button onClick="{{ addTag }}" title="Create an animation tag from the current frame" style="flex:none;display:flex;align-items:center;gap:5px;height:23px;padding:0 9px;background:transparent;border:1px dashed var(--line);border-radius:3px;cursor:pointer;font-size:11px;color:var(--dim);white-space:nowrap" style-hover="color:var(--gold);border-color:var(--gold)">+ Add tag</button>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:9px;flex:none;padding-left:10px">
+            <span style="font-size:10px;letter-spacing:.1em;color:var(--dim);white-space:nowrap">Active animation · <span style="color:var(--gold)">{{ activeTagText }}</span></span>
+            <button onClick="{{ clearActiveTag }}" title="Preview every frame instead" style="background:transparent;border:0;color:var(--dim);font-size:9px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;padding:0;white-space:nowrap" style-hover="color:var(--gold)">All frames</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="flex:1;min-height:0;display:flex;gap:9px;overflow-x:auto;padding:2px 2px 6px">
+        <sc-for list="{{ cards }}" as="fr" hint-placeholder-count="6">
+          <div draggable="true" onDragStart="{{ fr.dragStart }}" onDragOver="{{ fr.dragOver }}" onDrop="{{ fr.drop }}" onClick="{{ fr.pick }}" onDoubleClick="{{ fr.dup }}" onContextMenu="{{ fr.menu }}" title="{{ fr.title }}" style="position:relative;flex:none;width:86px;padding:6px 6px 5px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);cursor:pointer" style-hover="border-color:rgba(236,231,222,.34)">
+            <sc-if value="{{ fr.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;border:1px solid var(--gold);border-radius:4px;background:rgba(225,173,102,.09);pointer-events:none"></span></sc-if>
+            <sc-if value="{{ fr.hasTag }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:6px;right:6px;top:2px;height:2px;border-radius:1px;pointer-events:none;background:{{ fr.tagColor }}"></span></sc-if>
+            <div style="position:relative;display:flex;justify-content:center;background:var(--bg0);border:1px solid rgba(236,231,222,.08)">
+              <canvas ref="{{ fr.ref }}" style="display:block;image-rendering:pixelated"></canvas>
+            </div>
+            <div style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:5px">
+              <span style="font-size:10px;letter-spacing:.06em;color:var(--fg);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ fr.label }}</span>
+              <div style="display:flex;align-items:center;gap:5px;flex:none">
+                <button onClick="{{ fr.menu }}" title="More options" style="width:15px;height:15px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;color:var(--dim);cursor:pointer;padding:0;font-size:12px;line-height:1" style-hover="color:var(--gold)">⋯</button>
+                <sc-if value="{{ fr.isFrame }}" hint-placeholder-val="{{ true }}">
+                  <input type="checkbox" checked="{{ fr.sel }}" onChange="{{ fr.toggleSel }}" onClick="{{ stop }}" title="Include in sprite sheet" style="width:12px;height:12px;accent-color:var(--gold);cursor:pointer;margin:0">
+                </sc-if>
+              </div>
+            </div>
+            <div style="position:relative;margin-top:2px;font-size:9.5px;letter-spacing:.1em;color:var(--gold);font-variant-numeric:tabular-nums">{{ fr.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <footer style="display:flex;align-items:center;gap:16px;height:26px;padding:0 14px;background:var(--bg2);border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.08em;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden">
+    <sc-for list="{{ statusBits }}" as="b" hint-placeholder-count="6">
+      <span>{{ b.text }}</span>
+    </sc-for>
+    <span>Tool: {{ toolName }}</span>
+    <span>{{ coordText }}</span>
+    <span style="display:flex;align-items:center;gap:6px;color:var(--gold)"><span style="width:6px;height:6px;border-radius:50%;background:var(--gold)"></span>{{ autoStatus }}</span>
+    <span style="margin-left:auto;color:var(--gold);font-style:italic;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis">{{ hint }}</span>
+  </footer>
+
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeMenu }}" onContextMenu="{{ closeMenu }}" style="position:fixed;inset:0;z-index:60">
+      <div onClick="{{ stop }}" style="position:fixed;left:{{ menuX }}px;top:{{ menuY }}px;width:206px;background:var(--bg2);border:1px solid var(--line);border-radius:5px;box-shadow:0 18px 44px rgba(0,0,0,.6);padding:5px;display:flex;flex-direction:column;gap:1px">
+        <div style="padding:6px 9px 7px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--line);margin-bottom:4px">{{ menuTitle }}</div>
+        <sc-for list="{{ menuItems }}" as="m" hint-placeholder-count="5">
+          <button onClick="{{ m.click }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 9px;background:transparent;border:0;border-radius:3px;text-align:left;font-size:12px;color:var(--fg);cursor:pointer" style-hover="background:rgba(225,173,102,.14)"><span>{{ m.label }}</span><span style="font-size:10px;color:var(--dim);letter-spacing:.1em">{{ m.note }}</span></button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ tfxOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeTfx }}" style="position:fixed;inset:0;background:rgba(10,9,7,.6);display:flex;align-items:center;justify-content:center;z-index:70">
+      <div onClick="{{ stop }}" style="width:396px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line)">
+          <div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1">Transform frame</div>
+            <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px">{{ tfxTitle }}</div>
+          </div>
+          <button onClick="{{ closeTfx }}" style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)"><svg width="14" height="14" viewBox="0 0 24 24" class="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        </div>
+        <div style="display:flex;gap:16px;padding:18px">
+          <div style="width:104px;height:104px;flex:none;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;background:var(--bg0)">
+            <canvas ref="{{ tfxRef }}" style="display:block;image-rendering:pixelated"></canvas>
+          </div>
+          <div style="flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <sc-for list="{{ tfxActions }}" as="a" hint-placeholder-count="8">
+              <button onClick="{{ a.click }}" style="padding:7px 8px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11.5px;cursor:pointer;text-align:left;white-space:nowrap" style-hover="color:var(--gold);border-color:var(--gold)">{{ a.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px 18px">
+          <span style="font-size:10.5px;color:var(--dim);font-style:italic">Transforms stack — keep tapping to build the pose.</span>
+          <button onClick="{{ closeTfx }}" class="btn btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:fixed;inset:0;background:rgba(10,9,7,.72);display:flex;align-items:center;justify-content:center;z-index:50">
+      <div onClick="{{ stop }}" style="width:880px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line)">
+          <div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:23px;line-height:1.1">Sprite Sheet Manager</div>
+            <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px">Arrange &amp; export</div>
+          </div>
+          <button onClick="{{ closeSheet }}" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 292px">
+          <div style="padding:20px;border-right:1px solid var(--line);min-width:0">
+            <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:10px">Live preview</div>
+            <div style="display:flex;align-items:center;justify-content:center;min-height:290px;padding:16px;border:1px solid var(--line);border-radius:4px;background:var(--bg0)">
+              <canvas ref="{{ sheetRef }}" style="display:block;image-rendering:pixelated;box-shadow:0 0 0 1px rgba(236,231,222,.14)"></canvas>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:16px;background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden">
+              <div style="background:var(--bg1);padding:10px 12px">
+                <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Frames</div>
+                <div style="font-size:18px;font-family:'Cormorant Garamond',serif;font-variant-numeric:tabular-nums;margin-top:2px">{{ sheetFrames }}</div>
+              </div>
+              <div style="background:var(--bg1);padding:10px 12px">
+                <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Frame size</div>
+                <div style="font-size:18px;font-family:'Cormorant Garamond',serif;font-variant-numeric:tabular-nums;margin-top:2px">{{ dimText }}</div>
+              </div>
+              <div style="background:var(--bg1);padding:10px 12px">
+                <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Sheet size</div>
+                <div style="font-size:18px;font-family:'Cormorant Garamond',serif;font-variant-numeric:tabular-nums;margin-top:2px;color:var(--gold)">{{ sheetDim }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:20px;display:flex;flex-direction:column;gap:17px">
+            <div>
+              <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:8px">Layout</div>
+              <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+                <sc-for list="{{ layouts }}" as="l" hint-placeholder-count="3">
+                  <button onClick="{{ l.pick }}" style="position:relative;flex:1;padding:7px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+                    <sc-if value="{{ l.on }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                    <span style="position:relative">{{ l.label }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+
+            <sc-if value="{{ isGrid }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <span style="font-size:12px;color:var(--dim)">Columns</span>
+                <div style="display:flex;align-items:center;border:1px solid var(--line);border-radius:4px">
+                  <button onClick="{{ colsDown }}" style="width:26px;height:28px;background:transparent;border:0;color:var(--dim);cursor:pointer" style-hover="color:var(--gold)">–</button>
+                  <span style="width:30px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums">{{ cols }}</span>
+                  <button onClick="{{ colsUp }}" style="width:26px;height:28px;background:transparent;border:0;color:var(--dim);cursor:pointer" style-hover="color:var(--gold)">+</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <span style="font-size:12px;color:var(--dim)">Spacing</span>
+              <div style="display:flex;align-items:center;gap:9px">
+                <input type="range" min="0" max="8" step="1" value="{{ spacing }}" onInput="{{ setSpacing }}" style="width:112px;accent-color:var(--gold)">
+                <span style="width:26px;font-size:12px;font-variant-numeric:tabular-nums">{{ spacing }}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <span style="font-size:12px;color:var(--dim)">Padding</span>
+              <div style="display:flex;align-items:center;gap:9px">
+                <input type="range" min="0" max="16" step="1" value="{{ padding }}" onInput="{{ setPadding }}" style="width:112px;accent-color:var(--gold)">
+                <span style="width:26px;font-size:12px;font-variant-numeric:tabular-nums">{{ padding }}</span>
+              </div>
+            </div>
+
+            <div style="height:1px;background:var(--line)"></div>
+
+            <label style="display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);cursor:pointer">
+              <input type="checkbox" checked="{{ transparent }}" onChange="{{ setTransparent }}" style="width:14px;height:14px;accent-color:var(--gold);margin:0">Transparent background
+            </label>
+            <div>
+              <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:8px">Export</div>
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <sc-for list="{{ exportScopes }}" as="sc" hint-placeholder-count="3">
+                  <button onClick="{{ sc.pick }}" style="position:relative;padding:6px 9px;background:transparent;border:1px solid var(--line);border-radius:4px;text-align:left;font-size:11.5px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+                    <sc-if value="{{ sc.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.13);border-radius:4px"></span></sc-if>
+                    <span style="position:relative">{{ sc.label }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="margin-top:7px;font-size:10.5px;color:var(--gold);font-style:italic">{{ scopeNote }}</div>
+            </div>
+            <label style="display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);cursor:pointer">
+              <input type="checkbox" checked="{{ showCells }}" onChange="{{ setShowCells }}" style="width:14px;height:14px;accent-color:var(--gold);margin:0">Show cell guides in preview
+            </label>
+
+            <button onClick="{{ exportSheet }}" class="btn btn-primary" style="margin-top:auto;width:100%;gap:8px;padding:10px"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export Sprite Sheet</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ restoreOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;right:16px;bottom:44px;z-index:80;width:288px;background:var(--bg2);border:1px solid var(--gold);border-radius:5px;box-shadow:0 20px 50px rgba(0,0,0,.6);padding:14px">
+      <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)">Restore previous session?</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-top:6px;line-height:1.1">{{ restoreName }}</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:2px">{{ restoreWhen }} · autosaved in this browser</div>
+      <div style="display:flex;gap:7px;margin-top:13px">
+        <button onClick="{{ doRestore }}" style="flex:1;padding:7px;background:transparent;border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:12px;cursor:pointer" style-hover="background:rgba(225,173,102,.14)">Restore</button>
+        <button onClick="{{ dismissRestore }}" style="flex:1;padding:7px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)">Start new</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ newOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeNew }}" style="position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75">
+      <div onClick="{{ stop }}" style="width:392px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="padding:15px 18px;border-bottom:1px solid var(--line)">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1">New project</div>
+          <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px">Canvas &amp; name</div>
+        </div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Project name</div>
+            <input value="{{ npName }}" onInput="{{ setNpName }}" placeholder="player_walk" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none">
+          </div>
+          <div>
+            <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Canvas size</div>
+            <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+              <sc-for list="{{ npPresets }}" as="p" hint-placeholder-count="5">
+                <button onClick="{{ p.pick }}" style="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:10.5px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums;white-space:nowrap" style-hover="color:var(--fg)">
+                  <sc-if value="{{ p.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                  <span style="position:relative">{{ p.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;margin-top:9px">
+              <span style="font-size:11px;color:var(--dim);white-space:nowrap">Custom</span>
+              <input value="{{ npSize }}" onInput="{{ setNpSize }}" style="width:64px;background:transparent;border:1px solid var(--line);border-radius:4px;padding:5px 8px;color:var(--fg);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;outline:none">
+              <span style="font-size:11px;color:var(--dim)">px square · 4 to 128</span>
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);cursor:pointer">
+            <input type="checkbox" checked="{{ npTransparent }}" onChange="{{ setNpTransparent }}" style="width:14px;height:14px;accent-color:var(--gold);margin:0">Transparent background
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px 18px">
+          <span style="font-size:10.5px;color:var(--dim);font-style:italic">This replaces the working project.</span>
+          <div style="display:flex;gap:7px">
+            <button onClick="{{ closeNew }}" style="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" style-hover="color:var(--fg)">Cancel</button>
+            <button onClick="{{ createProject }}" class="btn btn-primary">Create project</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ saveAsOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSaveAs }}" style="position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75">
+      <div onClick="{{ stop }}" style="width:376px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1">Save project as</div>
+        <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px">Downloads a .pixelproj file</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:15px">
+          <input value="{{ saveAsName }}" onInput="{{ setSaveAsName }}" style="flex:1;min-width:0;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none">
+          <span style="font-size:12px;color:var(--dim)">.pixelproj</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--dim);font-style:italic;margin-top:9px">{{ autoStatus }} — the project file is a separate, portable copy.</div>
+        <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:16px">
+          <button onClick="{{ closeSaveAs }}" style="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" style-hover="color:var(--fg)">Cancel</button>
+          <button onClick="{{ confirmSaveAs }}" class="btn btn-primary">Save project</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ tagEditOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeTagEdit }}" style="position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75">
+      <div onClick="{{ stop }}" style="width:392px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1">{{ tagEditTitle }}</div>
+        <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px">Frame range &amp; playback</div>
+        <div style="display:flex;flex-direction:column;gap:13px;margin-top:16px">
+          <div>
+            <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Name</div>
+            <input value="{{ teName }}" onInput="{{ setTeName }}" placeholder="Walk" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none">
+          </div>
+          <div style="display:flex;gap:11px">
+            <div style="flex:1">
+              <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Start frame</div>
+              <input value="{{ teStart }}" onInput="{{ setTeStart }}" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none">
+            </div>
+            <div style="flex:1">
+              <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">End frame</div>
+              <input value="{{ teEnd }}" onInput="{{ setTeEnd }}" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none">
+            </div>
+          </div>
+          <div>
+            <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Playback</div>
+            <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+              <sc-for list="{{ teModes }}" as="m" hint-placeholder-count="3">
+                <button onClick="{{ m.pick }}" style="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+                  <sc-if value="{{ m.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                  <span style="position:relative">{{ m.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:17px">
+          <button onClick="{{ closeTagEdit }}" style="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" style-hover="color:var(--fg)">Cancel</button>
+          <button onClick="{{ saveTag }}" class="btn btn-primary">Save tag</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ tileSheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeTileSheet }}" style="position:fixed;inset:0;background:rgba(10,9,7,.72);display:flex;align-items:center;justify-content:center;z-index:50">
+      <div onClick="{{ stop }}" style="width:860px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line)">
+          <div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:23px;line-height:1.1">Tile Set Manager</div>
+            <div style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px">Arrange &amp; export tiles</div>
+          </div>
+          <button onClick="{{ closeTileSheet }}" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 292px">
+          <div style="padding:20px;border-right:1px solid var(--line);min-width:0">
+            <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:10px">Sheet preview</div>
+            <div style="display:flex;align-items:center;justify-content:center;min-height:280px;padding:16px;border:1px solid var(--line);border-radius:4px;background:var(--bg0)">
+              <canvas ref="{{ tileSheetRef }}" style="display:block;image-rendering:pixelated;box-shadow:0 0 0 1px rgba(236,231,222,.14)"></canvas>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:16px;background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden">
+              <div style="background:var(--bg1);padding:10px 12px">
+                <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Tiles</div>
+                <div style="font-size:18px;font-family:'Cormorant Garamond',serif;font-variant-numeric:tabular-nums;margin-top:2px">{{ tileSheetCount }}</div>
+              </div>
+              <div style="background:var(--bg1);padding:10px 12px">
+                <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Tile size</div>
+                <div style="font-size:18px;font-family:'Cormorant Garamond',serif;font-variant-numeric:tabular-nums;margin-top:2px">{{ dimText }}</div>
+              </div>
+              <div style="background:var(--bg1);padding:10px 12px">
+                <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">Sheet size</div>
+                <div style="font-size:18px;font-family:'Cormorant Garamond',serif;font-variant-numeric:tabular-nums;margin-top:2px;color:var(--gold)">{{ tileSheetDim }}</div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+            <div>
+              <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:8px">Layout</div>
+              <div style="display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden">
+                <sc-for list="{{ tileLayouts }}" as="l" hint-placeholder-count="3">
+                  <button onClick="{{ l.pick }}" style="position:relative;flex:1;padding:7px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" style-hover="color:var(--fg)">
+                    <sc-if value="{{ l.on }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)"></span></sc-if>
+                    <span style="position:relative">{{ l.label }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <sc-if value="{{ tileIsGrid }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <span style="font-size:12px;color:var(--dim)">Columns</span>
+                <div style="display:flex;align-items:center;border:1px solid var(--line);border-radius:4px">
+                  <button onClick="{{ tileColsDown }}" style="width:26px;height:28px;background:transparent;border:0;color:var(--dim);cursor:pointer" style-hover="color:var(--gold)">–</button>
+                  <span style="width:30px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums">{{ tileCols }}</span>
+                  <button onClick="{{ tileColsUp }}" style="width:26px;height:28px;background:transparent;border:0;color:var(--dim);cursor:pointer" style-hover="color:var(--gold)">+</button>
+                </div>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <span style="font-size:12px;color:var(--dim)">Spacing</span>
+              <div style="display:flex;align-items:center;gap:9px">
+                <input type="range" min="0" max="8" step="1" value="{{ tileSpacing }}" onInput="{{ setTileSpacing }}" style="width:112px;accent-color:var(--gold)">
+                <span style="width:26px;font-size:12px;font-variant-numeric:tabular-nums">{{ tileSpacing }}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <span style="font-size:12px;color:var(--dim)">Padding</span>
+              <div style="display:flex;align-items:center;gap:9px">
+                <input type="range" min="0" max="16" step="1" value="{{ tilePadding }}" onInput="{{ setTilePadding }}" style="width:112px;accent-color:var(--gold)">
+                <span style="width:26px;font-size:12px;font-variant-numeric:tabular-nums">{{ tilePadding }}</span>
+              </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);cursor:pointer">
+              <input type="checkbox" checked="{{ tileTransparent }}" onChange="{{ setTileTransparent }}" style="width:14px;height:14px;accent-color:var(--gold);margin:0">Transparent background
+            </label>
+            <div style="border:1px solid var(--line);border-radius:4px;padding:10px 11px">
+              <div style="font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px">tileset.json</div>
+              <div style="font-size:10.5px;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.6">
+                <sc-for list="{{ tileMetaNames }}" as="mn" hint-placeholder-count="5">
+                  <div>{{ mn.line }}</div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px;margin-top:auto">
+              <button onClick="{{ exportTileSet }}" class="btn btn-primary" style="width:100%;gap:8px;padding:10px"><svg width="15" height="15" viewBox="0 0 24 24" class="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export Tile Set PNG</button>
+              <button onClick="{{ exportTileMeta }}" style="width:100%;padding:8px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11.5px;cursor:pointer" style-hover="color:var(--fg);border-color:rgba(236,231,222,.3)">Export tileset.json metadata</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <input type="file" accept=".pixelproj,application/json" ref="{{ projRef }}" onChange="{{ onOpenProject }}" style="display:none">
+  <input type="file" accept="image/*" ref="{{ fileRef }}" onChange="{{ onImport }}" style="display:none">
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:940},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#e1ad66&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#e1ad66&quot;,&quot;#c2417a&quot;,&quot;#6fb0c9&quot;,&quot;#7fbf6a&quot;],&quot;section&quot;:&quot;Theme&quot;},&quot;showGridDefault&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Editor&quot;},&quot;tileDefault&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Editor&quot;},&quot;onionDefault&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;onionOpacityDefault&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:35,&quot;min&quot;:10,&quot;max&quot;:70,&quot;step&quot;:5,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;shadeModeDefault&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Palette ramp&quot;,&quot;options&quot;:[&quot;Palette ramp&quot;,&quot;Basic RGB&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Editor&quot;}}">
+const PALETTE = ['#15130f','#3b2f2a','#6b4f3a','#a8763f','#e1ad66','#f2d9a0','#f6f2e8','#ffffff','#3d1329','#7a2d52','#c2417a','#f07fae','#ffd0e2','#1b2c3a','#2f5670','#3f6d8c','#6fb0c9','#bfe3ef','#3f6b45','#7fbf6a'];
+const RAMPS = [
+  { name:'Glass — cool blues', colors:['#1b2c3a','#2f5670','#3f6d8c','#6fb0c9','#bfe3ef'] },
+  { name:'Potion — rose', colors:['#3d1329','#7a2d52','#c2417a','#f07fae','#ffd0e2'] },
+  { name:'Cork — warm woods', colors:['#3b2f2a','#6b4f3a','#a8763f','#e1ad66','#f2d9a0'] }
+];
+
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function rgb2hex(r,g,b){ const c=n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0'); return '#'+c(r)+c(g)+c(b); }
+function shade(h,amt){ const [r,g,b]=hex2rgb(h); return amt>0 ? rgb2hex(r+(255-r)*amt, g+(255-g)*amt, b+(255-b)*amt) : rgb2hex(r*(1+amt), g*(1+amt), b*(1+amt)); }
+function mix(a,b,t){ const A=hex2rgb(a), B=hex2rgb(b); return rgb2hex(A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t, A[2]+(B[2]-A[2])*t); }
+
+const IC = {
+  pencil:['M17.5 3.5a2.1 2.1 0 0 1 3 3L7.5 19.5 3 21l1.5-4.5z','M14.5 6.5l3 3'],
+  eraser:['M7 21l-4.3-4.3a2 2 0 0 1 0-2.8l9.6-9.6a2 2 0 0 1 2.8 0l5.6 5.6a2 2 0 0 1 0 2.8L13 21','M22 21H7','M5 11l9 9'],
+  picker:['M2 22l1-1h3l9-9','M3 21v-3l9-9','M15 6l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3z'],
+  fill:['M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z','M5 2l5 5','M2 13h15','M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z'],
+  lighten:['M12 5v2','M12 17v2','M5 12h2','M17 12h2','M7.05 7.05l1.4 1.4','M15.55 15.55l1.4 1.4','M16.95 7.05l-1.4 1.4','M8.45 15.55l-1.4 1.4'],
+  darken:['M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a6.8 6.8 0 0 0 11 11z'],
+  move:['M12 3v18','M3 12h18','M9 6l3-3 3 3','M9 18l3 3 3-3','M6 9l-3 3 3 3','M18 9l3 3-3 3'],
+  select:['M3 8V5a2 2 0 0 1 2-2h3','M16 3h3a2 2 0 0 1 2 2v3','M21 16v3a2 2 0 0 1-2 2h-3','M8 21H5a2 2 0 0 1-2-2v-3','M11 12h2'],
+  grid:['M3 3h18v18H3z','M9 3v18','M15 3v18','M3 9h18','M3 15h18'],
+  tile:['M3 3h7v7H3z','M14 3h7v7h-7z','M3 14h7v7H3z','M14 14h7v7h-7z'],
+  mirrorH:['M12 3v18','M8 7 4 12l4 5','M16 7l4 5-4 5'],
+  mirrorV:['M3 12h18','M7 8l5-4 5 4','M7 16l5 4 5-4'],
+  onion:['m12 2 9 5-9 5-9-5z','m21 12-9 5-9-5','m21 17-9 5-9-5'],
+  wrap:['M17 2l4 4-4 4','M3 11v-1a4 4 0 0 1 4-4h14','M7 22l-4-4 4-4','M21 13v1a4 4 0 0 1-4 4H3']
+};
+const TOOLS = [
+  {id:'pencil', name:'Pencil', key:'P', paths:IC.pencil},
+  {id:'eraser', name:'Eraser', key:'E', paths:IC.eraser},
+  {id:'picker', name:'Eyedropper', key:'I', paths:IC.picker},
+  {id:'fill', name:'Fill bucket', key:'F', paths:IC.fill},
+  {id:'lighten', name:'Lighten', key:'L', paths:IC.lighten, circle:true},
+  {id:'darken', name:'Darken', key:'D', paths:IC.darken},
+  {id:'move', name:'Move', key:'M', paths:IC.move},
+  {id:'select', name:'Selection', key:'S', paths:IC.select}
+];
+const ONION_PREV = '#c2417a', ONION_NEXT = '#6fb0c9';
+const AUTO_KEY = 'pixelstudio.autosave.v1';
+const TAG_COLORS = ['#7fbf6a','#6fb0c9','#c2417a','#e1ad66','#f07fae','#bfe3ef'];
+
+class Component extends DCLogic {
+  constructor(p){
+    super(p);
+    const size = 32;
+    this.state = {
+      size, frames:this.demoFrames(size), active:0, tool:'pencil',
+      projectName:'player_walk', named:false, dirty:false, savedAt:null,
+      autoState:'idle', autoAt:null, restore:null, pending:null,
+      workspace:'frames',
+      tags:[
+        { id:'t1', name:'Idle', start:1, end:4, mode:'Forward', color:'#7fbf6a' },
+        { id:'t2', name:'Walk', start:5, end:8, mode:'Forward', color:'#6fb0c9' },
+        { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
+      ],
+      activeTag:'t2', tagEdit:null,
+      tiles:this.demoTiles(size), activeTile:0, wrap:false, tilePreview:3,
+      tileExport:{ layout:'grid', cols:4, spacing:0, padding:0, transparent:true },
+      tileSheetOpen:false, newOpen:false, saveAs:null,
+      npName:'untitled', npSize:32, npTransparent:true,
+      exportScope:'all',
+      fg:'#c2417a', bg:'#15130f', palette:PALETTE.slice(), recent:['#c2417a','#f07fae','#6fb0c9','#a8763f'],
+      ramps:RAMPS.map(r=>({...r, colors:r.colors.slice()})),
+      shadeMode: p.shadeModeDefault === 'Basic RGB' ? 'rgb' : 'ramp',
+      cell:15, grid:p.showGridDefault !== false, tile:!!p.tileDefault,
+      mirrorH:false, mirrorV:false,
+      onion:{ on:!!p.onionDefault, prev:1, next:1, opacity:p.onionOpacityDefault || 35 },
+      selRect:null, clip:null,
+      playing:false, previewIdx:0,
+      hover:null, hint:'Drag on the canvas to draw — press S for the selection tool', sheetOpen:false,
+      menu:null, tfx:null,
+      layout:'grid', cols:4, spacing:2, padding:4, transparent:true, onlySelected:false, showCells:true
+    };
+    this.mainRef = React.createRef();
+    this.previewRef = React.createRef();
+    this.sheetRef = React.createRef();
+    this.tfxRef = React.createRef();
+    this.fileRef = React.createRef();
+    this.projRef = React.createRef();
+    this.tileSheetRef = React.createRef();
+    this.thumbs = {}; this.thumbRefs = {};
+    this.undoStack = []; this.redoStack = [];
+  }
+
+  /* ── example sprite: a potion flask, four bobbing frames ── */
+  sprite(f, N){
+    const px = new Array(N*N).fill(null);
+    if (N < 16) return px;
+    const OUT='#15130f', GL='#2f5670', GLH='#6fb0c9', CK='#6b4f3a', CKH='#a8763f';
+    const LQ='#c2417a', LQL='#f07fae', LQD='#7a2d52', SP='#e1ad66';
+    const at=(x,y)=> (x<0||x>=32||y<0||y>=32) ? -1 : y*32+x;
+    const buf = new Array(32*32).fill(null);
+    const set=(x,y,c)=>{ const i=at(x,y); if(i>=0) buf[i]=c; };
+    const get=(x,y)=>{ const i=at(x,y); return i<0?null:buf[i]; };
+
+    for (let y=0;y<32;y++) for (let x=0;x<32;x++){
+      const dx=x-15.5, dy=y-21.5;
+      if (dx*dx+dy*dy <= 8.7*8.7) set(x,y,GL);
+    }
+    for (let y=9;y<=14;y++) for (let x=13;x<=18;x++) set(x,y,GL);
+    for (let y=5;y<=8;y++) for (let x=13;x<=18;x++) set(x,y,CK);
+    for (let y=7;y<=8;y++) for (let x=12;x<=19;x++) set(x,y,CK);
+    for (let y=5;y<=8;y++){ set(14,y,CKH); }
+    set(15,5,CKH);
+
+    const level = 18 + (f===1?-1:0) + (f===3?1:0);
+    for (let x=0;x<32;x++){
+      const surf = level + (Math.sin((x + f*3)/2.4) > 0 ? 0 : 1);
+      for (let y=surf;y<32;y++){
+        if (get(x,y)===GL) set(x,y, y===surf ? LQL : (y>=27 ? LQD : LQ));
+      }
+    }
+    const bubbles = [[[13,26],[18,28]],[[13,24],[18,26]],[[13,22],[18,24]],[[14,20],[17,22]]][f%4];
+    bubbles.forEach(([bx,by])=>{ if(get(bx,by)===LQ||get(bx,by)===LQD) set(bx,by,LQL); });
+    for (let y=16;y<=22;y++){ if (get(11,y)===GL) set(11,y,GLH); }
+    if (get(12,15)===GL) set(12,15,GLH);
+    for (let y=10;y<=13;y++) if (get(14,y)===GL) set(14,y,GLH);
+    if (f%2===1){ set(22,6,SP); set(9,9,SP); } else { set(23,10,SP); }
+
+    const snap = buf.slice();
+    for (let y=0;y<32;y++) for (let x=0;x<32;x++){
+      if (!snap[at(x,y)]) continue;
+      const n = [[1,0],[-1,0],[0,1],[0,-1]];
+      if (n.some(([a,b]) => { const i=at(x+a,y+b); return i<0 || !snap[i]; })) buf[at(x,y)] = OUT;
+    }
+
+    if (N === 32) return buf;
+    const out = new Array(N*N).fill(null);
+    if (N > 32){ const o=Math.floor((N-32)/2); for(let y=0;y<32;y++)for(let x=0;x<32;x++) out[(y+o)*N+(x+o)] = buf[y*32+x]; }
+    else { const o=Math.floor((32-N)/2); for(let y=0;y<N;y++)for(let x=0;x<N;x++) out[y*N+x] = buf[(y+o)*32+(x+o)]; }
+    return out;
+  }
+
+  componentDidMount(){
+    if (this.props.accent) document.documentElement.style.setProperty('--gold', this.props.accent);
+    this.onKey = e => this.key(e);
+    window.addEventListener('keydown', this.onKey);
+    this.onResize = () => this.fit();
+    window.addEventListener('resize', this.onResize);
+    requestAnimationFrame(() => requestAnimationFrame(() => this.fit()));
+    const box = this.mainRef.current && this.mainRef.current.closest('main');
+    if (box && window.ResizeObserver){ this.ro = new ResizeObserver(() => this.fit()); this.ro.observe(box); }
+    try {
+      const raw = localStorage.getItem(AUTO_KEY);
+      if (raw){
+        const d = JSON.parse(raw);
+        if (d && d.frames && d.frames.length) this.setState({ pending:d, restore:{ name:d.name || 'untitled', at:d.at || Date.now() } });
+      }
+    } catch(err){}
+    this.tick = setInterval(() => { if (this.state.autoAt || this.state.savedAt) this.forceUpdate(); }, 15000);
+    this.beforeUnload = e => { if (this.state.dirty){ this.autosave(); } };
+    window.addEventListener('beforeunload', this.beforeUnload);
+    this.paint();
+  }
+  componentWillUnmount(){
+    window.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('beforeunload', this.beforeUnload);
+    if (this.ro) this.ro.disconnect();
+    clearTimeout(this.timer); clearTimeout(this.autoTimer); clearInterval(this.tick);
+  }
+  componentDidUpdate(){ if (this.autoFit !== false) this.fit(); this.paint(); }
+
+  fit(){
+    const cv = this.mainRef.current;
+    const box = cv && cv.closest('main');
+    if (!box) return;
+    const w = box.clientWidth, h = box.clientHeight;
+    if (w < 40 || h < 40) return;
+    const reps = this.state.tile ? 3 : 1;
+    const avail = Math.min(w, h) - 52;
+    const cell = Math.max(2, Math.min(40, Math.floor(avail / (this.state.size*reps))));
+    if (cell !== this.state.cell) this.setState({cell});
+  }
+
+  /* ── canvas painting ── */
+  blit(c, px, N, cell, ox, oy, alpha, tint){
+    if (alpha != null) c.globalAlpha = alpha;
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+      const v = px[y*N+x];
+      if (!v) continue;
+      c.fillStyle = tint ? mix(v, tint, .45) : v;
+      c.fillRect(ox + x*cell, oy + y*cell, cell, cell);
+    }
+    c.globalAlpha = 1;
+  }
+
+  draw(cv, px, N, cell, grid, checker){
+    if (!cv) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = N*cell;
+    cv.width = w*dpr; cv.height = w*dpr;
+    cv.style.width = w+'px'; cv.style.height = w+'px';
+    const c = cv.getContext('2d');
+    c.setTransform(dpr,0,0,dpr,0,0);
+    c.clearRect(0,0,w,w);
+    if (checker){
+      const q = Math.max(4, cell);
+      for (let y=0;y<w;y+=q) for (let x=0;x<w;x+=q){
+        c.fillStyle = ((x/q + y/q) % 2 === 0) ? '#242019' : '#1b1814';
+        c.fillRect(x,y,q,q);
+      }
+    }
+    this.blit(c, px, N, cell, 0, 0, null, null);
+    if (grid && cell >= 7) this.gridLines(c, N, cell, 0, 0);
+  }
+
+  gridLines(c, N, cell, ox, oy){
+    c.lineWidth = 1;
+    c.strokeStyle = 'rgba(236,231,222,.08)';
+    c.beginPath();
+    for (let i=1;i<N;i++){ c.moveTo(ox+i*cell+.5,oy); c.lineTo(ox+i*cell+.5,oy+N*cell); c.moveTo(ox,oy+i*cell+.5); c.lineTo(ox+N*cell,oy+i*cell+.5); }
+    c.stroke();
+    c.strokeStyle = 'rgba(225,173,102,.2)';
+    c.beginPath();
+    for (let i=8;i<N;i+=8){ c.moveTo(ox+i*cell+.5,oy); c.lineTo(ox+i*cell+.5,oy+N*cell); c.moveTo(ox,oy+i*cell+.5); c.lineTo(ox+N*cell,oy+i*cell+.5); }
+    c.stroke();
+  }
+
+  paintMain(){
+    const cv = this.mainRef.current;
+    if (!cv) return;
+    const s = this.state, N = s.size, cell = s.cell;
+    const reps = s.tile ? 3 : 1;
+    const W = N*cell*reps, off = s.tile ? N*cell : 0;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = W*dpr; cv.height = W*dpr;
+    cv.style.width = W+'px'; cv.style.height = W+'px';
+    const c = cv.getContext('2d');
+    c.setTransform(dpr,0,0,dpr,0,0);
+    c.clearRect(0,0,W,W);
+
+    const q = Math.max(4, cell);
+    for (let y=0;y<W;y+=q) for (let x=0;x<W;x+=q){
+      c.fillStyle = ((x/q + y/q) % 2 === 0) ? '#242019' : '#1b1814';
+      c.fillRect(x,y,q,q);
+    }
+
+    const px = this.curPx();
+    for (let ty=0;ty<reps;ty++) for (let tx=0;tx<reps;tx++){
+      const centre = !s.tile || (tx===1 && ty===1);
+      const ox = tx*N*cell, oy = ty*N*cell;
+      if (centre && s.onion.on && s.workspace === 'frames') this.paintOnion(c, ox, oy);
+      this.blit(c, px, N, cell, ox, oy, centre ? 1 : (s.workspace === 'tiles' ? .82 : .4), null);
+    }
+
+    if (s.tile){
+      c.fillStyle = 'rgba(21,19,15,.32)';
+      c.fillRect(0,0,W,off); c.fillRect(0,off+N*cell,W,off);
+      c.fillRect(0,off,off,N*cell); c.fillRect(off+N*cell,off,off,N*cell);
+      c.strokeStyle = 'rgba(236,231,222,.14)'; c.lineWidth = 1;
+      c.beginPath();
+      for (let i=1;i<3;i++){ c.moveTo(i*N*cell+.5,0); c.lineTo(i*N*cell+.5,W); c.moveTo(0,i*N*cell+.5); c.lineTo(W,i*N*cell+.5); }
+      c.stroke();
+    }
+
+    if (s.grid && cell >= 7) this.gridLines(c, N, cell, off, off);
+
+    if (s.tile){
+      c.strokeStyle = 'rgba(225,173,102,.75)'; c.lineWidth = 2;
+      c.strokeRect(off-1, off-1, N*cell+2, N*cell+2);
+    }
+
+    if (s.mirrorH || s.mirrorV){
+      c.save();
+      c.strokeStyle = 'rgba(225,173,102,.55)';
+      c.lineWidth = 1; c.setLineDash([5,4]);
+      c.beginPath();
+      if (s.mirrorH){ const mx = off + N*cell/2; c.moveTo(mx+.5, off); c.lineTo(mx+.5, off+N*cell); }
+      if (s.mirrorV){ const my = off + N*cell/2; c.moveTo(off, my+.5); c.lineTo(off+N*cell, my+.5); }
+      c.stroke();
+      c.restore();
+    }
+
+    if (s.selRect){
+      const r = s.selRect;
+      c.save();
+      c.lineWidth = 1;
+      c.strokeStyle = 'rgba(21,19,15,.85)';
+      c.strokeRect(off+r.x*cell+.5, off+r.y*cell+.5, r.w*cell-1, r.h*cell-1);
+      c.setLineDash([4,3]);
+      c.strokeStyle = '#e1ad66';
+      c.strokeRect(off+r.x*cell+.5, off+r.y*cell+.5, r.w*cell-1, r.h*cell-1);
+      c.restore();
+    }
+  }
+
+  paintOnion(c, ox, oy){
+    const s = this.state, N = s.size, cell = s.cell, o = s.onion;
+    const n = s.frames.length;
+    for (let k=o.prev;k>=1;k--){
+      const i = s.active - k;
+      if (i < 0) continue;
+      this.blit(c, s.frames[i].px, N, cell, ox, oy, (o.opacity/100)/k, ONION_PREV);
+    }
+    for (let k=o.next;k>=1;k--){
+      const i = s.active + k;
+      if (i >= n) continue;
+      this.blit(c, s.frames[i].px, N, cell, ox, oy, (o.opacity/100)/k, ONION_NEXT);
+    }
+  }
+
+  paint(){
+    const s = this.state;
+    const { frames, active, size, playing, previewIdx } = s;
+    this.paintMain();
+    if (s.workspace === 'tiles'){
+      this.paintTileRepeat();
+      s.tiles.forEach(t => { const el = this.thumbs[t.id]; if (el) this.draw(el, t.px, size, Math.max(1, Math.floor(66/size)), false, false); });
+    } else {
+      const pf = frames[(playing ? previewIdx : active) % frames.length];
+      this.draw(this.previewRef.current, pf.px, size, Math.max(1, Math.floor(88/size)), false, false);
+      frames.forEach(f => { const el = this.thumbs[f.id]; if (el) this.draw(el, f.px, size, Math.max(1, Math.floor(66/size)), false, false); });
+    }
+    if (s.tfx != null && frames[s.tfx]) this.draw(this.tfxRef.current, frames[s.tfx].px, size, Math.max(1, Math.floor(96/size)), false, false);
+    if (s.sheetOpen) this.paintSheet();
+    if (s.tileSheetOpen) this.paintTileSheet();
+  }
+
+  /* ── sprite sheet ── */
+  sheetGeom(){
+    const { size, layout, cols, spacing, padding } = this.state;
+    const list = this.sheetList();
+    const n = Math.max(1, list.length);
+    const c = layout==='horizontal' ? n : layout==='vertical' ? 1 : Math.max(1, Math.min(cols, n));
+    const r = Math.ceil(n / c);
+    return { list, c, r, w: padding*2 + c*size + (c-1)*spacing, h: padding*2 + r*size + (r-1)*spacing };
+  }
+  sheetList(){
+    const s = this.state;
+    if (s.exportScope === 'selected'){ const l = s.frames.filter(f=>f.sel); return l.length ? l : s.frames; }
+    if (s.exportScope === 'anim'){
+      const t = this.activeTagObj();
+      if (t){ const l = s.frames.slice(Math.max(0,t.start-1), t.end); if (l.length) return l; }
+    }
+    return s.frames;
+  }
+  paintSheet(){
+    const cv = this.sheetRef.current;
+    if (!cv) return;
+    const { size, spacing, padding, transparent, showCells } = this.state;
+    const g = this.sheetGeom();
+    const scale = Math.max(1, Math.floor(Math.min(470/g.w, 260/g.h)));
+    cv.width = g.w*scale; cv.height = g.h*scale;
+    cv.style.width = (g.w*scale)+'px'; cv.style.height = (g.h*scale)+'px';
+    const c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false;
+    c.clearRect(0,0,cv.width,cv.height);
+    if (!transparent){ c.fillStyle = '#15130f'; c.fillRect(0,0,cv.width,cv.height); }
+    else if (showCells){
+      const q = 8*scale;
+      for (let y=0;y<cv.height;y+=q) for (let x=0;x<cv.width;x+=q){
+        c.fillStyle = ((x/q + y/q)%2===0) ? '#242019' : '#1b1814';
+        c.fillRect(x,y,q,q);
+      }
+    }
+    g.list.forEach((f, i) => {
+      const ox = (padding + (i%g.c)*(size+spacing))*scale, oy = (padding + Math.floor(i/g.c)*(size+spacing))*scale;
+      this.blit(c, f.px, size, scale, ox, oy, null, null);
+      if (showCells){ c.strokeStyle = 'rgba(225,173,102,.35)'; c.lineWidth = 1; c.strokeRect(ox+.5, oy+.5, size*scale-1, size*scale-1); }
+    });
+  }
+
+  /* ── history ── */
+  snap(){
+    this.undoStack.push(this.cap());
+    if (this.undoStack.length > 60) this.undoStack.shift();
+    this.redoStack = [];
+    this.markDirty();
+  }
+  cap(){ return { frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), activeTile:this.state.activeTile, active:this.state.active, size:this.state.size, selRect:this.state.selRect }; }
+  undo(){ if (!this.undoStack.length) return; this.redoStack.push(this.cap()); this.setState(this.undoStack.pop()); }
+  redo(){ if (!this.redoStack.length) return; this.undoStack.push(this.cap()); this.setState(this.redoStack.pop()); }
+
+  /* ── pixel helpers ── */
+  cellAt(e){
+    const cv = this.mainRef.current;
+    const r = cv.getBoundingClientRect();
+    const { size, cell, tile, wrap } = this.state;
+    const off = tile ? size*cell : 0;
+    let x = Math.floor((e.clientX - r.left - off)/cell), y = Math.floor((e.clientY - r.top - off)/cell);
+    if (wrap && x > -size*2 && x < size*3 && y > -size*2 && y < size*3){
+      return { x:((x%size)+size)%size, y:((y%size)+size)%size };
+    }
+    return (x<0||y<0||x>=size||y>=size) ? null : {x,y};
+  }
+  mirrorPts(x,y){
+    const { size:N, mirrorH, mirrorV } = this.state;
+    const pts = [[x,y]];
+    if (mirrorH) pts.push([N-1-x, y]);
+    if (mirrorV) pts.push([x, N-1-y]);
+    if (mirrorH && mirrorV) pts.push([N-1-x, N-1-y]);
+    const seen = new Set();
+    return pts.filter(([a,b]) => { const k=a+':'+b; if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+  rampStep(col, dir){
+    if (this.state.shadeMode === 'ramp'){
+      for (const r of this.state.ramps){
+        const i = r.colors.findIndex(c => c.toLowerCase() === col.toLowerCase());
+        if (i >= 0) return r.colors[Math.max(0, Math.min(r.colors.length-1, i+dir))];
+      }
+    }
+    return shade(col, dir > 0 ? .13 : -.13);
+  }
+  grab(px, r){
+    const N = this.state.size, out = new Array(r.w*r.h).fill(null);
+    for (let y=0;y<r.h;y++) for (let x=0;x<r.w;x++){
+      const sx = r.x+x, sy = r.y+y;
+      if (sx>=0 && sx<N && sy>=0 && sy<N) out[y*r.w+x] = px[sy*N+sx];
+    }
+    return out;
+  }
+  put(px, r, buf){
+    const N = this.state.size;
+    for (let y=0;y<r.h;y++) for (let x=0;x<r.w;x++){
+      const dx = r.x+x, dy = r.y+y;
+      if (dx>=0 && dx<N && dy>=0 && dy<N) px[dy*N+dx] = buf[y*r.w+x];
+    }
+  }
+  clearRegion(px, r){
+    const N = this.state.size;
+    for (let y=0;y<r.h;y++) for (let x=0;x<r.w;x++){
+      const dx = r.x+x, dy = r.y+y;
+      if (dx>=0 && dx<N && dy>=0 && dy<N) px[dy*N+dx] = null;
+    }
+  }
+  curPx(){
+    const s = this.state;
+    if (s.workspace === 'tiles'){ const t = s.tiles[s.activeTile]; return t ? t.px : s.frames[s.active].px; }
+    return s.frames[s.active].px;
+  }
+  touch(){ this.forceUpdate(); this.markDirty(); }
+
+  /* ── drawing ── */
+  applyOne(x, y){
+    const { size, tool, fg } = this.state;
+    const px = this.curPx();
+    const i = y*size+x;
+    if (tool==='pencil') px[i] = fg;
+    else if (tool==='eraser') px[i] = null;
+    else if (tool==='picker'){ if (px[i]) this.pickColor(px[i]); }
+    else if (tool==='fill') this.flood(px, size, x, y, fg);
+    else if (tool==='lighten' || tool==='darken'){
+      if (this.stroked.has(i) || !px[i]) return;
+      this.stroked.add(i);
+      px[i] = this.rampStep(px[i], tool==='lighten' ? 1 : -1);
+    }
+  }
+  apply(x,y){
+    const { tool, size } = this.state;
+    if (tool==='move'){
+      const dx = x - this.moveStart.x, dy = y - this.moveStart.y, src = this.moveSnap, px = this.curPx();
+      for (let yy=0;yy<size;yy++) for (let xx=0;xx<size;xx++){
+        const sx = xx-dx, sy = yy-dy;
+        px[yy*size+xx] = (sx>=0&&sx<size&&sy>=0&&sy<size) ? src[sy*size+sx] : null;
+      }
+      return;
+    }
+    this.mirrorPts(x,y).forEach(([a,b]) => this.applyOne(a,b));
+  }
+  flood(px, N, x, y, col){
+    const target = px[y*N+x];
+    if (target === col) return;
+    const st = [[x,y]];
+    while (st.length){
+      const [cx,cy] = st.pop();
+      if (cx<0||cy<0||cx>=N||cy>=N) continue;
+      const i = cy*N+cx;
+      if (px[i] !== target) continue;
+      px[i] = col;
+      st.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+    }
+  }
+  pickColor(c){ this.setState({fg:c}); this.pushRecent(c); }
+  pushRecent(c){
+    this.setState(s => {
+      const list = [c].concat(s.recent.filter(x => x.toLowerCase() !== c.toLowerCase())).slice(0,12);
+      return { recent:list };
+    });
+  }
+
+  down(e){
+    const p = this.cellAt(e);
+    if (!p) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const s = this.state;
+    if (s.tool === 'select'){
+      this.snap();
+      const r = s.selRect;
+      if (r && p.x>=r.x && p.x<r.x+r.w && p.y>=r.y && p.y<r.y+r.h){
+        this.selMode = 'move';
+        this.selBuf = this.grab(this.curPx(), r);
+        const base = this.curPx().slice();
+        this.clearRegion(base, r);
+        this.selBase = base; this.selOrigin = {x:r.x, y:r.y}; this.selFrom = p;
+        this.setState({hint:'Dragging the selection — arrow keys nudge by one pixel'});
+      } else {
+        this.selMode = 'new';
+        this.selAnchor = p;
+        this.setState({selRect:{x:p.x, y:p.y, w:1, h:1}, hint:'Drag out a selection'});
+      }
+      this.drawing = true;
+      return;
+    }
+    this.drawing = true;
+    this.stroked = new Set();
+    if (s.tool !== 'picker') this.snap();
+    if (s.tool === 'move'){ this.moveStart = p; this.moveSnap = this.curPx().slice(); }
+    if (s.tool === 'pencil' || s.tool === 'fill') this.pushRecent(s.fg);
+    this.last = p;
+    this.apply(p.x, p.y);
+    this.touch();
+  }
+  move(e){
+    const p = this.cellAt(e);
+    if (p && (!this.state.hover || this.state.hover.x!==p.x || this.state.hover.y!==p.y)) this.setState({hover:p});
+    if (!this.drawing || !p) return;
+    if (this.state.tool === 'select'){
+      if (this.selMode === 'new'){
+        const a = this.selAnchor;
+        this.setState({selRect:{ x:Math.min(a.x,p.x), y:Math.min(a.y,p.y), w:Math.abs(p.x-a.x)+1, h:Math.abs(p.y-a.y)+1 }});
+      } else {
+        const dx = p.x - this.selFrom.x, dy = p.y - this.selFrom.y;
+        const px = this.curPx();
+        for (let i=0;i<px.length;i++) px[i] = this.selBase[i];
+        const r = { x:this.selOrigin.x+dx, y:this.selOrigin.y+dy, w:this.state.selRect.w, h:this.state.selRect.h };
+        this.put(px, r, this.selBuf);
+        this.setState({selRect:r});
+      }
+      return;
+    }
+    if (this.last && this.state.tool!=='move' && this.state.tool!=='fill'){
+      let { x:x0, y:y0 } = this.last;
+      const dx = Math.abs(p.x-x0), dy = Math.abs(p.y-y0), sx = x0<p.x?1:-1, sy = y0<p.y?1:-1;
+      let err = dx-dy;
+      for (let n=0;n<400;n++){
+        this.apply(x0,y0);
+        if (x0===p.x && y0===p.y) break;
+        const e2 = 2*err;
+        if (e2 > -dy){ err -= dy; x0 += sx; }
+        if (e2 < dx){ err += dx; y0 += sy; }
+      }
+    } else this.apply(p.x, p.y);
+    this.last = p;
+    this.touch();
+  }
+  up(){ this.drawing = false; this.last = null; this.selMode = null; }
+
+  /* ── selection actions ── */
+  selCopy(){
+    const r = this.state.selRect; if (!r) return;
+    this.setState({ clip:{ w:r.w, h:r.h, buf:this.grab(this.curPx(), r) }, hint:'Copied '+r.w+'×'+r.h+' px' });
+  }
+  selCut(){
+    const r = this.state.selRect; if (!r) return;
+    this.snap();
+    const buf = this.grab(this.curPx(), r);
+    this.clearRegion(this.curPx(), r);
+    this.setState({ clip:{w:r.w, h:r.h, buf}, hint:'Cut '+r.w+'×'+r.h+' px' });
+  }
+  selPaste(){
+    const cl = this.state.clip; if (!cl) return;
+    this.snap();
+    const r = this.state.selRect || {x:0,y:0};
+    const rect = { x:r.x, y:r.y, w:cl.w, h:cl.h };
+    this.put(this.curPx(), rect, cl.buf);
+    this.setState({ selRect:rect, hint:'Pasted at '+rect.x+', '+rect.y });
+  }
+  selDelete(){
+    const r = this.state.selRect; if (!r) return;
+    this.snap();
+    this.clearRegion(this.curPx(), r);
+    this.setState({hint:'Cleared selection'});
+  }
+  selTransform(kind){
+    const r = this.state.selRect; if (!r) return;
+    this.snap();
+    const buf = this.grab(this.curPx(), r);
+    let out = buf, rect = r;
+    if (kind==='flipH'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[y*r.w+(r.w-1-x)]; }
+    else if (kind==='flipV'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[(r.h-1-y)*r.w+x]; }
+    else if (kind==='rot'){
+      out = new Array(r.w*r.h).fill(null);
+      for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[x*r.h+(r.h-1-y)] = buf[y*r.w+x];
+      rect = { x:r.x, y:r.y, w:r.h, h:r.w };
+    }
+    const px = this.curPx();
+    this.clearRegion(px, r);
+    this.put(px, rect, out);
+    this.setState({selRect:rect});
+  }
+  nudge(dx,dy){
+    const r = this.state.selRect; if (!r) return;
+    this.snap();
+    const px = this.curPx();
+    const buf = this.grab(px, r);
+    this.clearRegion(px, r);
+    const rect = { x:r.x+dx, y:r.y+dy, w:r.w, h:r.h };
+    this.put(px, rect, buf);
+    this.setState({selRect:rect, hint:'Nudged selection'});
+  }
+
+  /* ── frame transforms ── */
+  transformFrame(i, kind){
+    this.snap();
+    this.setState(s => {
+      const N = s.size, src = s.frames[i].px, out = new Array(N*N).fill(null);
+      for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+        const v = src[y*N+x];
+        let tx = x, ty = y;
+        if (kind==='flipH') tx = N-1-x;
+        else if (kind==='flipV') ty = N-1-y;
+        else if (kind==='rot'){ tx = N-1-y; ty = x; }
+        else if (kind==='left') tx = x-1;
+        else if (kind==='right') tx = x+1;
+        else if (kind==='up') ty = y-1;
+        else if (kind==='down') ty = y+1;
+        if (tx<0||tx>=N||ty<0||ty>=N) continue;
+        out[ty*N+tx] = v;
+      }
+      const frames = s.frames.slice();
+      frames[i] = {...frames[i], px:out};
+      return { frames };
+    });
+  }
+
+  key(e){
+    const t = e.target;
+    if (t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA')) return;
+    const mod = e.metaKey || e.ctrlKey;
+    const k = e.key.toLowerCase();
+    if (mod){
+      if (k==='s'){ e.preventDefault(); this.saveProject(e.shiftKey); return; }
+      if (k==='o'){ e.preventDefault(); if (this.projRef.current) this.projRef.current.click(); return; }
+      if (k==='z'){ e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); return; }
+      if (k==='y'){ e.preventDefault(); this.redo(); return; }
+      if (k==='c'){ e.preventDefault(); this.selCopy(); return; }
+      if (k==='x'){ e.preventDefault(); this.selCut(); return; }
+      if (k==='v'){ e.preventDefault(); this.selPaste(); return; }
+      return;
+    }
+    if (k===' '){ e.preventDefault(); this.play(); return; }
+    if (k==='escape'){ this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, tileSheetOpen:false}); return; }
+    if ((k==='delete' || k==='backspace') && this.state.selRect){ e.preventDefault(); this.selDelete(); return; }
+    if (k.startsWith('arrow')){
+      const d = { arrowleft:[-1,0], arrowright:[1,0], arrowup:[0,-1], arrowdown:[0,1] }[k];
+      if (this.state.selRect){ e.preventDefault(); this.nudge(d[0], d[1]); return; }
+      if (k==='arrowright') this.setState(s=>({active:(s.active+1)%s.frames.length}));
+      if (k==='arrowleft') this.setState(s=>({active:(s.active-1+s.frames.length)%s.frames.length}));
+      return;
+    }
+    const map = { p:'pencil', e:'eraser', i:'picker', f:'fill', l:'lighten', d:'darken', m:'move', s:'select' };
+    if (map[k]){ const tl = TOOLS.find(x=>x.id===map[k]); this.setState({tool:map[k], hint:tl.name}); }
+    else if (k==='g') this.setState(v=>({grid:!v.grid}));
+    else if (k==='t') this.setState(v=>({tile:!v.tile}), ()=>this.fit());
+    else if (k==='w') this.setState(v=>({wrap:!v.wrap, hint:v.wrap?'Wrap drawing off':'Wrap drawing on — paint past an edge and it wraps'}));
+    else if (k==='o') this.setState(v=>({onion:{...v.onion, on:!v.onion.on}}));
+    else if (k==='h') this.setState(v=>({mirrorH:!v.mirrorH}));
+    else if (k==='v') this.setState(v=>({mirrorV:!v.mirrorV}));
+  }
+
+  /* ── frames ── */
+  addFrame(){
+    this.snap();
+    this.setState(s => {
+      const frames = s.frames.slice();
+      frames.splice(s.active+1, 0, { id:'f'+Date.now(), px:new Array(s.size*s.size).fill(null), sel:true, dur:s.frames[s.active].dur });
+      return { frames, active:s.active+1 };
+    });
+  }
+  dupFrame(at, then){
+    this.snap();
+    this.setState(s => {
+      const i = at == null ? s.active : at;
+      const src = s.frames[i];
+      const frames = s.frames.slice();
+      frames.splice(i+1, 0, { id:'f'+Date.now(), px:src.px.slice(), sel:true, dur:src.dur });
+      return { frames, active:i+1 };
+    }, then);
+  }
+  delFrame(at){
+    if (this.state.frames.length <= 1) return;
+    this.snap();
+    this.setState(s => {
+      const i = at == null ? s.active : at;
+      return { frames:s.frames.filter((_,j)=>j!==i), active:Math.max(0, Math.min(s.frames.length-2, i>0?i-1:0)) };
+    });
+  }
+  reorder(from, to){
+    if (from===to) return;
+    this.snap();
+    this.setState(s => {
+      const frames = s.frames.slice();
+      const [m] = frames.splice(from,1);
+      frames.splice(to,0,m);
+      return { frames, active:to };
+    });
+  }
+  setDur(i, ms){
+    const v = Math.max(20, Math.min(2000, Math.round(ms/10)*10));
+    this.setState(s => { const frames = s.frames.slice(); frames[i] = {...frames[i], dur:v}; return { frames }; }, () => this.markDirty());
+  }
+
+  setSize(n){
+    this.snap();
+    this.setState(s => {
+      const frames = s.frames.map(f => {
+        const out = new Array(n*n).fill(null);
+        if (n > s.size){ const o=Math.floor((n-s.size)/2); for(let y=0;y<s.size;y++)for(let x=0;x<s.size;x++) out[(y+o)*n+(x+o)] = f.px[y*s.size+x]; }
+        else { const o=Math.floor((s.size-n)/2); for(let y=0;y<n;y++)for(let x=0;x<n;x++) out[y*n+x] = f.px[(y+o)*s.size+(x+o)]; }
+        return {...f, px:out};
+      });
+      return { size:n, frames, selRect:null };
+    }, () => this.fit());
+  }
+
+  /* ── playback on per-frame durations ── */
+  play(){
+    clearTimeout(this.timer);
+    if (this.state.playing){ this.setState({playing:false}); return; }
+    if (this.state.workspace === 'tiles'){ this.setState({hint:'Playback is for animation frames — switch to Frames'}); return; }
+    const r = this.range();
+    this.dir = r.mode === 'Reverse' ? -1 : 1;
+    const start = r.mode === 'Reverse' ? r.b : r.a;
+    this.setState({ playing:true, previewIdx:start }, () => this.schedule());
+  }
+  schedule(){
+    if (!this.state.playing) return;
+    const f = this.state.frames[this.state.previewIdx] || this.state.frames[0];
+    this.timer = setTimeout(() => {
+      if (!this.state.playing) return;
+      const r = this.range();
+      this.setState(s => {
+        let i = s.previewIdx + this.dir;
+        if (r.mode === 'Ping Pong'){
+          if (i > r.b){ this.dir = -1; i = Math.max(r.a, r.b-1); }
+          else if (i < r.a){ this.dir = 1; i = Math.min(r.b, r.a+1); }
+        } else if (r.mode === 'Reverse'){ if (i < r.a) i = r.b; }
+        else if (i > r.b) i = r.a;
+        return { previewIdx:i };
+      }, () => this.schedule());
+    }, Math.max(20, f.dur || 100));
+  }
+
+  dl(cv, name){
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/png'); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  exportPng(){
+    const { size, frames, active } = this.state;
+    const cv = document.createElement('canvas');
+    this.draw(cv, frames[active].px, size, 8, false, false);
+    this.dl(cv, 'sprite-frame-'+(active+1)+'.png');
+    this.setState({hint:'Exported frame '+(active+1)+' as PNG'});
+  }
+  exportSheet(){
+    const cv = document.createElement('canvas');
+    const g = this.sheetGeom();
+    const { size, spacing, padding, transparent } = this.state;
+    cv.width = g.w; cv.height = g.h;
+    const c = cv.getContext('2d');
+    if (!transparent){ c.fillStyle='#15130f'; c.fillRect(0,0,g.w,g.h); }
+    g.list.forEach((f,i)=>{
+      const ox = padding + (i%g.c)*(size+spacing), oy = padding + Math.floor(i/g.c)*(size+spacing);
+      this.blit(c, f.px, size, 1, ox, oy, null, null);
+    });
+    this.dl(cv, 'sprite-sheet-'+g.w+'x'+g.h+'.png');
+    this.setState({hint:'Exported sheet '+g.w+'×'+g.h});
+  }
+  onImport(e){
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      const { size } = this.state;
+      const tmp = document.createElement('canvas');
+      tmp.width = size; tmp.height = size;
+      const c = tmp.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      c.drawImage(img, 0, 0, size, size);
+      const d = c.getImageData(0,0,size,size).data;
+      this.snap();
+      this.setState(s => {
+        const frames = s.frames.slice();
+        const px = new Array(size*size).fill(null);
+        for (let i=0;i<size*size;i++){ if (d[i*4+3] > 24) px[i] = rgb2hex(d[i*4], d[i*4+1], d[i*4+2]); }
+        frames[s.active] = {...frames[s.active], px};
+        return { frames, hint:'Imported '+file.name };
+      });
+    };
+    img.src = URL.createObjectURL(file);
+    e.target.value = '';
+  }
+
+  /* ── demo content ── */
+  demoFrames(N){
+    const durs = [180,180,200,180, 90,90,100,90, 70,60,120,200];
+    return durs.map((d,i) => ({ id:'f'+i, px:this.demoPx(i,N), sel:true, dur:d }));
+  }
+  demoPx(i,N){
+    const base = this.sprite(i%4, N);
+    const dx = i>=4 && i<8 ? [-1,0,1,0][i-4] : 0;
+    const dy = i>=8 ? [1,2,0,-1][i-8] : 0;
+    if (!dx && !dy) return base;
+    const out = new Array(N*N).fill(null);
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+      const sx=x-dx, sy=y-dy;
+      if (sx>=0&&sx<N&&sy>=0&&sy<N) out[y*N+x] = base[sy*N+sx];
+    }
+    return out;
+  }
+  demoTiles(N){
+    return ['Grass','Dirt','Water','Stone','Path'].map((n,i) => ({ id:'t'+i, name:n, px:this.tilePx(n.toLowerCase(), N) }));
+  }
+  tilePx(kind, N){
+    const P = {
+      grass:['#3f6b45','#7fbf6a','#2c4a31'], dirt:['#6b4f3a','#a8763f','#3b2f2a'],
+      water:['#2f5670','#6fb0c9','#1b2c3a'], stone:['#3b3a36','#6a6862','#26251f'],
+      path:['#a8763f','#e1ad66','#6b4f3a']
+    }[kind] || ['#3b2f2a','#a8763f','#15130f'];
+    const px = new Array(N*N).fill(P[0]);
+    const h = (x,y) => { const v = Math.sin(x*12.9898 + y*78.233) * 43758.5453; return v - Math.floor(v); };
+    const q = Math.max(4, Math.round(N/4));
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+      const r = h(x,y);
+      let c = r > .84 ? P[1] : r < .16 ? P[2] : P[0];
+      if (kind==='water'){ const band = Math.sin((y/N)*Math.PI*2 + x*.18) > .55; c = band ? P[1] : (r<.1 ? P[2] : P[0]); }
+      if (kind==='stone' || kind==='path'){ if (x % q === 0 || y % q === 0) c = P[2]; else if ((x+y) % q === 1) c = P[1]; }
+      px[y*N+x] = c;
+    }
+    return px;
+  }
+
+  /* ── project format ── */
+  serialize(){
+    const s = this.state;
+    return {
+      format:'pixelproj', version:1, name:s.projectName, size:s.size,
+      frames:s.frames.map(f=>({ id:f.id, px:f.px, sel:f.sel, dur:f.dur })),
+      tags:s.tags, activeTag:s.activeTag,
+      palette:s.palette, ramps:s.ramps, recent:s.recent, shadeMode:s.shadeMode,
+      mirror:{ h:s.mirrorH, v:s.mirrorV },
+      tileSettings:{ on:s.tile, wrap:s.wrap, preview:s.tilePreview },
+      onion:s.onion,
+      sheet:{ layout:s.layout, cols:s.cols, spacing:s.spacing, padding:s.padding, transparent:s.transparent, scope:s.exportScope },
+      tiles:s.tiles.map(t=>({ id:t.id, name:t.name, px:t.px })),
+      activeTile:s.activeTile, tileExport:s.tileExport, workspace:s.workspace
+    };
+  }
+  loadProject(d, named){
+    const size = d.size || 32;
+    const ts = d.tileSettings || {};
+    const sh = d.sheet || {};
+    this.undoStack = []; this.redoStack = [];
+    this.setState({
+      projectName: d.name || 'untitled', named:!!named, dirty:false, savedAt: named ? Date.now() : null,
+      size,
+      frames: (d.frames && d.frames.length) ? d.frames.map((f,i)=>({ id:f.id||'f'+i, px:f.px||new Array(size*size).fill(null), sel:f.sel!==false, dur:f.dur||120 })) : this.demoFrames(size),
+      active:0,
+      tags: d.tags || [], activeTag: d.activeTag || null,
+      palette: d.palette || PALETTE.slice(),
+      ramps: d.ramps || RAMPS.map(r=>({...r, colors:r.colors.slice()})),
+      recent: d.recent || [], shadeMode: d.shadeMode || 'ramp',
+      mirrorH: !!(d.mirror && d.mirror.h), mirrorV: !!(d.mirror && d.mirror.v),
+      tile: !!ts.on, wrap: !!ts.wrap, tilePreview: ts.preview || 3,
+      onion: d.onion || { on:false, prev:1, next:1, opacity:35 },
+      layout: sh.layout || 'grid', cols: sh.cols || 4,
+      spacing: sh.spacing == null ? 2 : sh.spacing, padding: sh.padding == null ? 4 : sh.padding,
+      transparent: sh.transparent !== false, exportScope: sh.scope || 'all',
+      tiles: (d.tiles && d.tiles.length) ? d.tiles : this.demoTiles(size),
+      activeTile: d.activeTile || 0,
+      tileExport: d.tileExport || { layout:'grid', cols:4, spacing:0, padding:0, transparent:true },
+      workspace: d.workspace || 'frames',
+      selRect:null, clip:null, playing:false, restore:null, pending:null, menu:null, tfx:null,
+      hint:'Opened ' + (d.name || 'project') + '.pixelproj'
+    }, () => this.fit());
+  }
+  writeProject(name){
+    const clean = (name||'untitled').trim().replace(/\.pixelproj$/i,'') || 'untitled';
+    const blob = new Blob([JSON.stringify({...this.serialize(), name:clean})], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = clean + '.pixelproj';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    this.setState({ projectName:clean, named:true, dirty:false, savedAt:Date.now(), saveAs:null, hint:'Saved ' + clean + '.pixelproj' });
+  }
+  saveProject(forceAs){
+    if (forceAs || !this.state.named){ this.setState({ saveAs:{ name:this.state.projectName }, menu:null }); return; }
+    this.writeProject(this.state.projectName);
+  }
+  onOpenProject(e){
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const d = JSON.parse(rd.result);
+        if (!d || !d.frames) throw new Error('bad');
+        this.loadProject(d, true);
+        this.setState({ projectName:(d.name || file.name.replace(/\.pixelproj$/i,'')) });
+      } catch(err){ this.setState({ hint:'Could not read ' + file.name + ' — not a project file' }); }
+    };
+    rd.readAsText(file);
+  }
+  createProject(){
+    const s = this.state;
+    const n = Math.max(4, Math.min(128, parseInt(s.npSize,10) || 32));
+    this.undoStack = []; this.redoStack = [];
+    this.setState({
+      projectName:(s.npName||'untitled').trim() || 'untitled', named:false, dirty:true, savedAt:null,
+      size:n, frames:[{ id:'f'+Date.now(), px:new Array(n*n).fill(null), sel:true, dur:120 }], active:0,
+      tags:[], activeTag:null, tiles:[{ id:'tl'+Date.now(), name:'Tile 1', px:new Array(n*n).fill(s.npTransparent ? null : s.bg) }],
+      activeTile:0, workspace:'frames', selRect:null, clip:null, playing:false, newOpen:false,
+      transparent:!!s.npTransparent, restore:null,
+      hint:'New project — ' + n + '×' + n
+    }, () => { this.fit(); this.markDirty(); });
+  }
+
+  /* ── autosave ── */
+  markDirty(){
+    clearTimeout(this.autoTimer);
+    if (!this.state.dirty || this.state.autoState !== 'pending') this.setState({ dirty:true, autoState:'pending' });
+    this.autoTimer = setTimeout(() => this.autosave(), 900);
+  }
+  autosave(){
+    this.setState({ autoState:'saving' });
+    try {
+      localStorage.setItem(AUTO_KEY, JSON.stringify({ ...this.serialize(), at:Date.now(), named:this.state.named }));
+      setTimeout(() => this.setState({ autoState:'saved', autoAt:Date.now() }), 220);
+    } catch(err){ this.setState({ autoState:'error' }); }
+  }
+  ago(t){
+    if (!t) return '';
+    const d = Math.max(0, Math.round((Date.now()-t)/1000));
+    if (d < 10) return 'just now';
+    if (d < 60) return d + ' sec ago';
+    if (d < 3600) return Math.round(d/60) + ' min ago';
+    return Math.round(d/3600) + ' hr ago';
+  }
+  autoText(){
+    const s = this.state;
+    if (s.autoState === 'saving') return 'Saving…';
+    if (s.autoState === 'pending') return 'Unsaved changes';
+    if (s.autoState === 'error') return 'Local storage full';
+    if (s.autoState === 'saved') return 'Saved locally · ' + this.ago(s.autoAt);
+    return 'Autosave ready';
+  }
+
+  /* ── animation tags ── */
+  activeTagObj(){ return this.state.tags.find(t => t.id === this.state.activeTag) || null; }
+  range(){
+    const s = this.state, n = s.frames.length, t = this.activeTagObj();
+    if (t) return { a:Math.max(0,Math.min(n-1,t.start-1)), b:Math.max(0,Math.min(n-1,t.end-1)), mode:t.mode || 'Forward' };
+    return { a:0, b:n-1, mode:'Forward' };
+  }
+  tagOf(i){ return this.state.tags.find(t => i+1 >= t.start && i+1 <= t.end) || null; }
+  pickTag(t){
+    this.setState({ activeTag:t.id, active:Math.max(0, t.start-1), playing:false, hint:'Animation: ' + t.name + ' — frames ' + t.start + '–' + t.end });
+    clearTimeout(this.timer);
+  }
+  saveTag(){
+    const e = this.state.tagEdit;
+    if (!e) return;
+    const n = this.state.frames.length;
+    const start = Math.max(1, Math.min(n, parseInt(e.start,10) || 1));
+    const end = Math.max(start, Math.min(n, parseInt(e.end,10) || start));
+    this.setState(s => {
+      const tags = s.tags.slice();
+      const rec = { id:e.id || 'tg'+Date.now(), name:(e.name||'Animation').trim(), start, end, mode:e.mode || 'Forward', color:e.color || TAG_COLORS[tags.length % TAG_COLORS.length] };
+      const i = tags.findIndex(t => t.id === rec.id);
+      if (i >= 0) tags[i] = rec; else tags.push(rec);
+      return { tags, tagEdit:null, activeTag:rec.id, hint:'Tag ' + rec.name + ' · frames ' + start + '–' + end };
+    }, () => this.markDirty());
+  }
+
+  /* ── tile set ── */
+  addTile(){
+    this.setState(s => {
+      const tiles = s.tiles.slice();
+      tiles.splice(s.activeTile+1, 0, { id:'tl'+Date.now(), name:'Tile ' + (tiles.length+1), px:new Array(s.size*s.size).fill(null) });
+      return { tiles, activeTile:s.activeTile+1, workspace:'tiles', hint:'New tile' };
+    }, () => this.markDirty());
+  }
+  dupTile(at){
+    this.setState(s => {
+      const i = at == null ? s.activeTile : at;
+      const src = s.tiles[i];
+      const tiles = s.tiles.slice();
+      tiles.splice(i+1, 0, { id:'tl'+Date.now(), name:src.name + ' copy', px:src.px.slice() });
+      return { tiles, activeTile:i+1, hint:'Duplicated ' + src.name };
+    }, () => this.markDirty());
+  }
+  delTile(at){
+    if (this.state.tiles.length <= 1) return;
+    this.setState(s => {
+      const i = at == null ? s.activeTile : at;
+      return { tiles:s.tiles.filter((_,j)=>j!==i), activeTile:Math.max(0, i-1) };
+    }, () => this.markDirty());
+  }
+  renameTile(at){
+    const i = at == null ? this.state.activeTile : at;
+    const t = this.state.tiles[i];
+    const v = window.prompt('Tile name', t.name);
+    if (v == null) return;
+    this.setState(s => { const tiles = s.tiles.slice(); tiles[i] = {...tiles[i], name:v.trim() || t.name}; return { tiles }; }, () => this.markDirty());
+  }
+  moveTile(from, to){
+    if (to < 0 || to >= this.state.tiles.length || from === to) return;
+    this.setState(s => {
+      const tiles = s.tiles.slice();
+      const [m] = tiles.splice(from,1);
+      tiles.splice(to,0,m);
+      return { tiles, activeTile:to };
+    }, () => this.markDirty());
+  }
+  tileGeom(){
+    const s = this.state, t = s.tileExport, n = Math.max(1, s.tiles.length);
+    const c = t.layout==='horizontal' ? n : t.layout==='vertical' ? 1 : Math.max(1, Math.min(t.cols, n));
+    const r = Math.ceil(n/c);
+    return { c, r, w:t.padding*2 + c*s.size + (c-1)*t.spacing, h:t.padding*2 + r*s.size + (r-1)*t.spacing };
+  }
+  paintTileSheet(){
+    const cv = this.tileSheetRef.current;
+    if (!cv) return;
+    const s = this.state, t = s.tileExport, g = this.tileGeom();
+    const scale = Math.max(1, Math.floor(Math.min(440/g.w, 250/g.h)));
+    cv.width = g.w*scale; cv.height = g.h*scale;
+    cv.style.width = (g.w*scale)+'px'; cv.style.height = (g.h*scale)+'px';
+    const c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false;
+    c.clearRect(0,0,cv.width,cv.height);
+    if (!t.transparent){ c.fillStyle = '#15130f'; c.fillRect(0,0,cv.width,cv.height); }
+    s.tiles.forEach((tl,i) => {
+      const ox = (t.padding + (i%g.c)*(s.size+t.spacing))*scale, oy = (t.padding + Math.floor(i/g.c)*(s.size+t.spacing))*scale;
+      this.blit(c, tl.px, s.size, scale, ox, oy, null, null);
+      c.strokeStyle = i===s.activeTile ? 'rgba(225,173,102,.8)' : 'rgba(236,231,222,.16)';
+      c.lineWidth = 1;
+      c.strokeRect(ox+.5, oy+.5, s.size*scale-1, s.size*scale-1);
+    });
+  }
+  exportTileSet(){
+    const s = this.state, t = s.tileExport, g = this.tileGeom();
+    const cv = document.createElement('canvas');
+    cv.width = g.w; cv.height = g.h;
+    const c = cv.getContext('2d');
+    if (!t.transparent){ c.fillStyle = '#15130f'; c.fillRect(0,0,g.w,g.h); }
+    s.tiles.forEach((tl,i) => {
+      const ox = t.padding + (i%g.c)*(s.size+t.spacing), oy = t.padding + Math.floor(i/g.c)*(s.size+t.spacing);
+      this.blit(c, tl.px, s.size, 1, ox, oy, null, null);
+    });
+    this.dl(cv, (this.state.projectName || 'tileset') + '-tileset.png');
+    this.setState({ hint:'Exported tile set ' + g.w + '×' + g.h });
+  }
+  exportTileMeta(){
+    const s = this.state, t = s.tileExport, g = this.tileGeom();
+    const tiles = {};
+    s.tiles.forEach((tl,i) => { tiles[tl.name.toLowerCase().replace(/\s+/g,'_')] = i; });
+    const meta = {
+      image:(s.projectName||'tileset') + '-tileset.png',
+      tileWidth:s.size, tileHeight:s.size, count:s.tiles.length,
+      columns:g.c, spacing:t.spacing, padding:t.padding, tiles
+    };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(meta, null, 2)], {type:'application/json'}));
+    a.download = (s.projectName||'tileset') + '-tileset.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    this.setState({ hint:'Exported tile set metadata' });
+  }
+  paintTileRepeat(){
+    const cv = this.previewRef.current;
+    if (!cv) return;
+    const s = this.state, N = s.size, r = s.tilePreview;
+    cv.width = N*r; cv.height = N*r;
+    cv.style.width = '92px'; cv.style.height = '92px';
+    const c = cv.getContext('2d');
+    c.setTransform(1,0,0,1,0,0);
+    c.clearRect(0,0,N*r,N*r);
+    const tl = s.tiles[s.activeTile];
+    if (!tl) return;
+    for (let ty=0;ty<r;ty++) for (let tx=0;tx<r;tx++) this.blit(c, tl.px, N, 1, tx*N, ty*N, null, null);
+  }
+
+  /* ── menus ── */
+  openMenu(kind, i, e){
+    e.preventDefault(); e.stopPropagation();
+    const x = Math.min(e.clientX, window.innerWidth - 230);
+    const y = Math.max(10, Math.min(e.clientY, window.innerHeight - 300));
+    const patch = { menu:{ kind, i, x, y } };
+    if (kind === 'frame') patch.active = i;
+    if (kind === 'tile') patch.activeTile = i;
+    this.setState(patch);
+  }
+  menuTitleText(){
+    const m = this.state.menu;
+    if (!m) return '';
+    if (m.kind === 'file') return 'Project';
+    if (m.kind === 'tag'){ const t = this.state.tags[m.i]; return t ? t.name : 'Tag'; }
+    if (m.kind === 'tile'){ const t = this.state.tiles[m.i]; return t ? t.name : 'Tile'; }
+    return 'Frame ' + (m.i+1);
+  }
+  menuFor(){
+    const m = this.state.menu;
+    if (!m) return [];
+    const s = this.state;
+    const close = fn => () => { this.setState({menu:null}); if (fn) fn(); };
+    if (m.kind === 'file') return [
+      { label:'New Project…', note:'', click:close(()=>this.setState({ newOpen:true, npName:'untitled', npSize:s.size })) },
+      { label:'Open Project…', note:'⌘O', click:close(()=>this.projRef.current && this.projRef.current.click()) },
+      { label:'Save', note:'⌘S', click:close(()=>this.saveProject(false)) },
+      { label:'Save As…', note:'⇧⌘S', click:close(()=>this.saveProject(true)) },
+      { label:'Import Image…', note:'', click:close(()=>this.fileRef.current && this.fileRef.current.click()) },
+      { label:'Export PNG', note:'', click:close(()=>this.exportPng()) },
+      { label:'Export Sprite Sheet…', note:'', click:close(()=>this.setState({sheetOpen:true})) },
+      { label:'Export Tile Set…', note:'', click:close(()=>this.setState({tileSheetOpen:true})) }
+    ];
+    if (m.kind === 'tag'){
+      const t = s.tags[m.i];
+      if (!t) return [];
+      return [
+        { label:'Set as active animation', note:'', click:close(()=>this.pickTag(t)) },
+        { label:'Rename / edit range…', note:'', click:close(()=>this.setState({ tagEdit:{...t} })) },
+        { label:'Duplicate tag', note:'', click:close(()=>this.setState(v=>({ tags:v.tags.concat([{...t, id:'tg'+Date.now(), name:t.name+' copy'}]) }), ()=>this.markDirty())) },
+        { label:'Playback: Forward', note:'', click:close(()=>this.setTagMode(m.i,'Forward')) },
+        { label:'Playback: Reverse', note:'', click:close(()=>this.setTagMode(m.i,'Reverse')) },
+        { label:'Playback: Ping Pong', note:'', click:close(()=>this.setTagMode(m.i,'Ping Pong')) },
+        { label:'Delete tag', note:'', click:close(()=>this.setState(v=>({ tags:v.tags.filter((_,j)=>j!==m.i), activeTag:v.activeTag===t.id?null:v.activeTag }), ()=>this.markDirty())) }
+      ];
+    }
+    if (m.kind === 'tile') return [
+      { label:'Duplicate tile', note:'', click:close(()=>this.dupTile(m.i)) },
+      { label:'Rename tile…', note:'', click:close(()=>this.renameTile(m.i)) },
+      { label:'Move left', note:'', click:close(()=>this.moveTile(m.i, m.i-1)) },
+      { label:'Move right', note:'', click:close(()=>this.moveTile(m.i, m.i+1)) },
+      { label:'Delete tile', note:'', click:close(()=>this.delTile(m.i)) }
+    ];
+    return [
+      { label:'Duplicate', note:'', click:close(()=>this.dupFrame(m.i)) },
+      { label:'Duplicate + Transform', note:'', click:close(()=>this.dupFrame(m.i, ()=>this.setState(v=>({tfx:v.active})))) },
+      { label:'Move left', note:'', click:close(()=>{ if (m.i>0) this.reorder(m.i, m.i-1); }) },
+      { label:'Move right', note:'', click:close(()=>{ if (m.i<s.frames.length-1) this.reorder(m.i, m.i+1); }) },
+      { label:'Transform in place', note:'', click:close(()=>this.setState({tfx:m.i})) },
+      { label:'Create animation tag…', note:'', click:close(()=>this.setState({ tagEdit:{ id:null, name:'Animation', start:m.i+1, end:Math.min(s.frames.length, m.i+4), mode:'Forward' } })) },
+      { label:'Delete frame', note:'', click:close(()=>this.delFrame(m.i)) }
+    ];
+  }
+  setTagMode(i, mode){
+    this.setState(s => { const tags = s.tags.slice(); tags[i] = {...tags[i], mode}; return { tags, hint:tags[i].name + ' · ' + mode }; }, () => this.markDirty());
+  }
+
+  /* ── unified timeline cards ── */
+  cardList(){
+    const s = this.state;
+    if (s.workspace === 'tiles') return s.tiles.map((t,i) => ({
+      label:t.name, sub:'Tile ' + (i+1) + ' / ' + s.tiles.length, isFrame:false, hasTag:false,
+      title:t.name + ' — click to edit, right-click for options, drag to reorder',
+      on:i === s.activeTile, sel:false, dur:0, tagColor:'transparent',
+      ref:this.thumbRefs[t.id] || (this.thumbRefs[t.id] = el => { this.thumbs[t.id] = el; }),
+      pick:()=>this.setState({ activeTile:i, hint:'Editing tile ' + t.name }),
+      dup:()=>this.dupTile(i),
+      menu:e=>this.openMenu('tile', i, e),
+      toggleSel:()=>{},
+      dragStart:e=>{ this.dragFrom = i; e.dataTransfer.effectAllowed='move'; },
+      dragOver:e=>e.preventDefault(),
+      drop:e=>{ e.preventDefault(); if (this.dragFrom != null) this.moveTile(this.dragFrom, i); this.dragFrom = null; }
+    }));
+    return s.frames.map((f,i) => {
+      const tg = this.tagOf(i);
+      return {
+        label:String(i+1).padStart(2,'0'), sub:f.dur + ' ms', isFrame:true,
+        hasTag:!!tg, tagColor:tg ? tg.color : 'transparent',
+        title:'Frame ' + (i+1) + (tg ? ' · ' + tg.name : '') + ' — click to edit, double-click to duplicate, drag to reorder, right-click for options',
+        on:i === s.active, sel:!!f.sel, dur:f.dur,
+        ref:this.thumbRefs[f.id] || (this.thumbRefs[f.id] = el => { this.thumbs[f.id] = el; }),
+        pick:()=>this.setState({active:i}),
+        dup:()=>this.dupFrame(i),
+        menu:e=>this.openMenu('frame', i, e),
+        toggleSel:()=>this.setState(v=>{ const frames=v.frames.slice(); frames[i]={...frames[i], sel:!frames[i].sel}; return {frames}; }),
+        dragStart:e=>{ this.dragFrom = i; e.dataTransfer.effectAllowed='move'; },
+        dragOver:e=>e.preventDefault(),
+        drop:e=>{ e.preventDefault(); if (this.dragFrom != null) this.reorder(this.dragFrom, i); this.dragFrom = null; }
+      };
+    });
+  }
+
+  /* ── render values for the new panels ── */
+  projVals(){
+    const s = this.state;
+    return {
+      projName: s.projectName + '.pixelproj',
+      dirtyMark: s.dirty ? '*' : '',
+      isDirty: s.dirty,
+      fileSavedText: s.savedAt ? 'Project file saved ' + this.ago(s.savedAt) : 'Project file not saved yet',
+      autoStatus: this.autoText(),
+      openFileMenu: e => this.openMenu('file', 0, e),
+      quickSave: () => this.saveProject(false),
+
+      newOpen: s.newOpen,
+      closeNew: () => this.setState({newOpen:false}),
+      npName: s.npName,
+      setNpName: e => this.setState({npName:e.target.value}),
+      npSize: s.npSize,
+      setNpSize: e => this.setState({npSize:e.target.value}),
+      npPresets: [8,16,32,64,128].map(n => ({ label:n+' × '+n, on:+s.npSize===n, pick:()=>this.setState({npSize:n}) })),
+      npTransparent: s.npTransparent,
+      setNpTransparent: e => this.setState({npTransparent:e.target.checked}),
+      createProject: () => this.createProject(),
+
+      saveAsOpen: !!s.saveAs,
+      saveAsName: s.saveAs ? s.saveAs.name : '',
+      setSaveAsName: e => this.setState(v=>({ saveAs:{...v.saveAs, name:e.target.value} })),
+      closeSaveAs: () => this.setState({saveAs:null}),
+      confirmSaveAs: () => this.writeProject(this.state.saveAs.name),
+
+      restoreOpen: !!s.restore,
+      restoreName: s.restore ? s.restore.name : '',
+      restoreWhen: s.restore ? ('Last edited ' + this.ago(s.restore.at)) : '',
+      doRestore: () => { if (this.state.pending) this.loadProject(this.state.pending, this.state.pending.named); },
+      dismissRestore: () => { try { localStorage.removeItem(AUTO_KEY); } catch(e){} this.setState({ restore:null, pending:null, hint:'Started a fresh session' }); },
+
+      projRef: this.projRef,
+      onOpenProject: e => this.onOpenProject(e)
+    };
+  }
+  tagVals(){
+    const s = this.state;
+    const at = this.activeTagObj();
+    return {
+      tagChips: s.tags.map((t,i) => ({
+        name:t.name, range:t.start + '–' + t.end, color:t.color, mode:t.mode || 'Forward',
+        on:t.id === s.activeTag,
+        title:t.name + ' — frames ' + t.start + '–' + t.end + ' · ' + (t.mode||'Forward') + ' · right-click to manage',
+        pick:()=>this.pickTag(t),
+        menu:e=>this.openMenu('tag', i, e)
+      })),
+      noTags: s.tags.length === 0,
+      addTag: () => this.setState(v=>({ tagEdit:{ id:null, name:'Animation ' + (v.tags.length+1), start:v.active+1, end:Math.min(v.frames.length, v.active+4), mode:'Forward' } })),
+      activeTagText: at ? (at.name + ' · ' + at.start + '–' + at.end + ' · ' + (at.mode||'Forward')) : 'All frames',
+      clearActiveTag: () => this.setState({ activeTag:null, hint:'Previewing all frames' }),
+
+      tagEditOpen: !!s.tagEdit,
+      tagEditTitle: s.tagEdit && s.tagEdit.id ? 'Edit animation tag' : 'New animation tag',
+      teName: s.tagEdit ? s.tagEdit.name : '',
+      teStart: s.tagEdit ? s.tagEdit.start : 1,
+      teEnd: s.tagEdit ? s.tagEdit.end : 1,
+      setTeName: e => this.setState(v=>({ tagEdit:{...v.tagEdit, name:e.target.value} })),
+      setTeStart: e => this.setState(v=>({ tagEdit:{...v.tagEdit, start:e.target.value} })),
+      setTeEnd: e => this.setState(v=>({ tagEdit:{...v.tagEdit, end:e.target.value} })),
+      teModes: ['Forward','Reverse','Ping Pong'].map(mo => ({ label:mo, on:s.tagEdit && (s.tagEdit.mode||'Forward')===mo, pick:()=>this.setState(v=>({ tagEdit:{...v.tagEdit, mode:mo} })) })),
+      closeTagEdit: () => this.setState({tagEdit:null}),
+      saveTag: () => this.saveTag()
+    };
+  }
+  tileVals(){
+    const s = this.state;
+    const t = s.tiles[s.activeTile];
+    const g = s.tileSheetOpen ? this.tileGeom() : {w:0,h:0,c:1};
+    const setTe = patch => this.setState(v=>({ tileExport:{...v.tileExport, ...patch} }), ()=>this.markDirty());
+    return {
+      workspaces: [['frames','Frames','Animation frames — sprite workflow'],['tiles','Tiles','Tile set — seamless texture workflow']].map(([id,label,tip]) => ({
+        label, tip, on:s.workspace===id,
+        pick:()=>this.setState({ workspace:id, playing:false, selRect:null, tile:id==='tiles' ? true : s.tile, hint:id==='tiles' ? 'Tile set — the centre tile is editable' : 'Animation frames' }, ()=>this.fit())
+      })),
+      isFrames: s.workspace === 'frames',
+      isTiles: s.workspace === 'tiles',
+      tileName: t ? t.name : '—',
+      tileCountText: t ? ('Tile ' + (s.activeTile+1) + ' / ' + s.tiles.length) : '',
+      addTile: () => this.addTile(),
+      dupTileBtn: () => this.dupTile(),
+      renameTileBtn: () => this.renameTile(),
+      delTileBtn: () => this.delTile(),
+      wrapOn: s.wrap,
+      previewSizes: [3,5,8].map(n => ({ label:n+'×'+n, on:s.tilePreview===n, pick:()=>this.setState({tilePreview:n}) })),
+
+      tileSheetOpen: s.tileSheetOpen,
+      openTileSheet: () => this.setState({tileSheetOpen:true}),
+      closeTileSheet: () => this.setState({tileSheetOpen:false}),
+      tileSheetRef: this.tileSheetRef,
+      tileLayouts: [['horizontal','Horizontal'],['vertical','Vertical'],['grid','Grid']].map(([id,label]) => ({
+        label, on:s.tileExport.layout===id, pick:()=>setTe({layout:id})
+      })),
+      tileIsGrid: s.tileExport.layout === 'grid',
+      tileCols: s.tileExport.cols,
+      tileColsUp: () => setTe({cols:Math.min(12, s.tileExport.cols+1)}),
+      tileColsDown: () => setTe({cols:Math.max(1, s.tileExport.cols-1)}),
+      tileSpacing: s.tileExport.spacing,
+      setTileSpacing: e => setTe({spacing:+e.target.value}),
+      tilePadding: s.tileExport.padding,
+      setTilePadding: e => setTe({padding:+e.target.value}),
+      tileTransparent: s.tileExport.transparent,
+      setTileTransparent: e => setTe({transparent:e.target.checked}),
+      tileSheetDim: g.w + ' × ' + g.h,
+      tileSheetCount: s.tiles.length,
+      exportTileSet: () => this.exportTileSet(),
+      exportTileMeta: () => this.exportTileMeta(),
+      tileMetaNames: s.tiles.map((tl,i) => ({ line:'"' + tl.name.toLowerCase().replace(/\s+/g,'_') + '": ' + i })),
+
+      statusBits: (s.workspace === 'tiles'
+        ? [ s.size + ' × ' + s.size + ' px', 'Zoom ' + (s.cell*100) + '%', 'Tile: ' + (t ? t.name : '—'), 'Tile ' + (s.activeTile+1) + ' / ' + s.tiles.length, 'Tile Mode: ' + (s.tile?'On':'Off'), 'Wrap: ' + (s.wrap?'On':'Off') ]
+        : [ s.size + ' × ' + s.size + ' px', 'Zoom ' + (s.cell*100) + '%', 'Frame ' + (s.active+1) + ' / ' + s.frames.length, 'Animation: ' + (this.activeTagObj() ? this.activeTagObj().name : 'All frames'), 'Mirror: ' + (s.mirrorH&&s.mirrorV?'Both':s.mirrorH?'H':s.mirrorV?'V':'Off'), 'Onion: ' + (s.onion.on ? (s.onion.prev+'←→'+s.onion.next) : 'Off') ]
+      ).map(text => ({ text }))
+    };
+  }
+
+  renderVals(){
+    const s = this.state;
+    const g = s.sheetOpen ? this.sheetGeom() : {w:0,h:0,list:[]};
+    const tool = TOOLS.find(t=>t.id===s.tool) || TOOLS[0];
+    const totalMs = s.frames.reduce((a,f)=>a+(f.dur||100),0);
+
+    const mkIcon = (paths, circle, px) => React.createElement('svg',
+      { width:px||19, height:px||19, viewBox:'0 0 24 24', className:'ic' },
+      (circle ? [React.createElement('circle',{key:'c', cx:12, cy:12, r:4})] : []).concat(
+        paths.map((d,i)=>React.createElement('path',{key:i, d}))));
+
+    const menu = s.menu;
+    const menuItems = this.menuFor();
+
+    const tfxKinds = [['flipH','Flip horizontal'],['flipV','Flip vertical'],['rot','Rotate 90°'],['left','Shift left 1 px'],['right','Shift right 1 px'],['up','Shift up 1 px'],['down','Shift down 1 px']];
+
+    return {
+      ...this.projVals(), ...this.tagVals(), ...this.tileVals(),
+      cards: this.cardList(),
+      tools: TOOLS.map(t => ({
+        tip: t.name + ' — ' + t.key,
+        on: s.tool === t.id,
+        icon: mkIcon(t.paths, t.circle),
+        pick: () => this.setState({tool:t.id, hint:t.name}),
+        hover: () => this.setState({hint:t.name + '  ·  ' + t.key})
+      })),
+      clearHint: () => this.setState({hint:''}),
+      toolName: tool.name,
+
+      viewToggles: [
+        { label:'Grid', tip:'Pixel grid — G', on:s.grid, icon:mkIcon(IC.grid, false, 14), click:()=>this.setState(v=>({grid:!v.grid})) },
+        { label:'Tile', tip:'Tile mode — T', on:s.tile, icon:mkIcon(IC.tile, false, 14), click:()=>this.setState(v=>({tile:!v.tile, hint:v.tile?'Tile mode off':'Tile mode — the centre tile is editable'}), ()=>this.fit()) },
+        { label:'Mirror H', tip:'Mirror across the vertical axis — H', on:s.mirrorH, icon:mkIcon(IC.mirrorH, false, 14), click:()=>this.setState(v=>({mirrorH:!v.mirrorH})) },
+        { label:'Mirror V', tip:'Mirror across the horizontal axis — V', on:s.mirrorV, icon:mkIcon(IC.mirrorV, false, 14), click:()=>this.setState(v=>({mirrorV:!v.mirrorV})) },
+        { label:'Onion', tip:'Onion skin — O', on:s.onion.on, icon:mkIcon(IC.onion, false, 14), click:()=>this.setState(v=>({onion:{...v.onion, on:!v.onion.on}})) },
+        { label:'Wrap', tip:'Wrap drawing across the tile edges — W', on:s.wrap, icon:mkIcon(IC.wrap, false, 14), click:()=>this.setState(v=>({wrap:!v.wrap, hint:v.wrap?'Wrap drawing off':'Wrap drawing on — paint past an edge and it wraps'})) }
+      ],
+
+      shadeModes: [['ramp','Palette ramp','Lighten and darken step along a ramp'],['rgb','Basic RGB','Lighten and darken shift the raw colour']].map(([id,label,tip]) => ({
+        label, tip, on:s.shadeMode===id, pick:()=>this.setState({shadeMode:id, hint:'Shading: '+label})
+      })),
+
+      sizes: [8,16,32,64,128].map(n => ({ label:n+'×'+n, title:'Resize canvas to '+n+'×'+n, on:s.size===n, pick:()=>this.setSize(n) })),
+      clearCanvas: () => { this.snap(); this.setState(v=>{ const frames=v.frames.slice(); frames[v.active]={...frames[v.active], px:new Array(v.size*v.size).fill(null)}; return {frames, hint:'Cleared frame '+(v.active+1)}; }); },
+      openImport: () => this.fileRef.current && this.fileRef.current.click(),
+      onImport: e => this.onImport(e),
+      exportPng: () => this.exportPng(),
+      fileRef: this.fileRef,
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+
+      mainRef: this.mainRef,
+      previewRef: this.previewRef,
+      sheetRef: this.sheetRef,
+      tfxRef: this.tfxRef,
+      onDown: e => this.down(e),
+      onMove: e => this.move(e),
+      onUp: () => this.up(),
+      onLeave: () => { this.up(); this.setState({hover:null}); },
+
+      zoomIn: () => { this.autoFit = false; this.setState(v=>({cell:Math.min(40, v.cell+2)})); },
+      zoomOut: () => { this.autoFit = false; this.setState(v=>({cell:Math.max(2, v.cell-2)})); },
+      zoomFit: () => { this.autoFit = true; this.fit(); },
+      zoomText: (s.cell*100) + '%',
+
+      fgColor: s.fg,
+      bgColor: s.bg,
+      hexText: s.fg.replace('#','').toUpperCase(),
+      setFg: e => this.setState({fg:e.target.value}),
+      setHex: e => { const v = '#' + e.target.value.replace('#','').trim(); if (/^#[0-9a-f]{6}$/i.test(v)) this.setState({fg:v}); },
+      swapColors: () => this.setState(v=>({fg:v.bg, bg:v.fg})),
+      swatches: s.palette.map(c => ({
+        color: c, on: c.toLowerCase()===s.fg.toLowerCase(), title: c.toUpperCase()+' — right-click to remove',
+        pick: () => this.setState({fg:c}),
+        remove: e => { e.preventDefault(); this.setState(v=>({palette:v.palette.filter(x=>x!==c)})); }
+      })),
+      addSwatch: () => this.setState(v => v.palette.includes(v.fg) ? {hint:'Already in palette'} : {palette:v.palette.concat([v.fg]), hint:'Added '+v.fg.toUpperCase()}),
+      recents: s.recent.map(c => ({ color:c, title:c.toUpperCase(), pick:()=>this.setState({fg:c}) })),
+      noRecents: s.recent.length === 0,
+
+      ramps: s.ramps.map((r, ri) => ({
+        name: r.name,
+        stops: r.colors.map((c, ci) => ({
+          color: c, on: c.toLowerCase()===s.fg.toLowerCase(), title: c.toUpperCase()+' — step '+(ci+1)+' of '+r.colors.length,
+          pick: () => this.setState({fg:c}),
+          remove: e => { e.preventDefault(); this.setState(v=>{ const ramps=v.ramps.map(x=>({...x, colors:x.colors.slice()})); ramps[ri].colors.splice(ci,1); return {ramps}; }); },
+          dragStart: e => { this.rampDrag = {ri, ci}; e.dataTransfer.effectAllowed='move'; },
+          dragOver: e => e.preventDefault(),
+          drop: e => {
+            e.preventDefault();
+            const d = this.rampDrag;
+            if (!d || d.ri !== ri) return;
+            this.setState(v => { const ramps=v.ramps.map(x=>({...x, colors:x.colors.slice()})); const [m]=ramps[ri].colors.splice(d.ci,1); ramps[ri].colors.splice(ci,0,m); return {ramps}; });
+            this.rampDrag = null;
+          }
+        })),
+        add: () => this.setState(v=>{ const ramps=v.ramps.map(x=>({...x, colors:x.colors.slice()})); ramps[ri].colors.push(v.fg); return {ramps, hint:'Added '+v.fg.toUpperCase()+' to '+r.name}; }),
+        remove: () => this.setState(v=>({ ramps:v.ramps.filter((_,i)=>i!==ri) }))
+      })),
+      addRamp: () => this.setState(v=>({ ramps:v.ramps.concat([{ name:'Ramp '+(v.ramps.length+1), colors:[shade(v.fg,-.35), shade(v.fg,-.18), v.fg, shade(v.fg,.2)] }]), hint:'New ramp from '+v.fg.toUpperCase() })),
+
+      onionOn: s.onion.on,
+      onionLabel: s.onion.on ? 'On' : 'Off',
+      toggleOnion: () => this.setState(v=>({onion:{...v.onion, on:!v.onion.on}})),
+      prevOpts: [0,1,2].map(n => ({ label:n, on:s.onion.prev===n, pick:()=>this.setState(v=>({onion:{...v.onion, prev:n, on:true}})) })),
+      nextOpts: [0,1,2].map(n => ({ label:n, on:s.onion.next===n, pick:()=>this.setState(v=>({onion:{...v.onion, next:n, on:true}})) })),
+      onionOpacity: s.onion.opacity,
+      setOnionOpacity: e => { const v = +e.target.value; this.setState(o=>({onion:{...o.onion, opacity:v}})); },
+
+      hasSel: !!s.selRect,
+      tileOn: s.tile,
+      selText: s.selRect ? (s.selRect.w + '×' + s.selRect.h + ' at ' + s.selRect.x + ',' + s.selRect.y) : '',
+      selActions: [
+        { label:'Copy', tip:'Copy selection — ⌘C', click:()=>this.selCopy() },
+        { label:'Cut', tip:'Cut selection — ⌘X', click:()=>this.selCut() },
+        { label:'Paste', tip:'Paste at the selection origin — ⌘V', click:()=>this.selPaste() },
+        { label:'Delete', tip:'Clear the selected pixels — Delete', click:()=>this.selDelete() },
+        { label:'Flip H', tip:'Flip the selection horizontally', click:()=>this.selTransform('flipH') },
+        { label:'Flip V', tip:'Flip the selection vertically', click:()=>this.selTransform('flipV') },
+        { label:'Rotate', tip:'Rotate the selection 90°', click:()=>this.selTransform('rot') },
+        { label:'Deselect', tip:'Drop the selection — Esc', click:()=>this.setState({selRect:null}) }
+      ],
+
+      togglePlay: () => this.play(),
+      playLabel: s.playing ? 'Pause' : 'Play',
+      playIcon: React.createElement('svg', {width:13, height:13, viewBox:'0 0 24 24', className:'ic'},
+        s.playing
+          ? [React.createElement('path',{key:'a', d:'M9 4v16'}), React.createElement('path',{key:'b', d:'M15 4v16'})]
+          : [React.createElement('path',{key:'p', d:'M7 4l13 8-13 8z'})]),
+      durPresets: [60,100,160,240].map(n => ({ label:n, title:'Set every frame to '+n+' ms', pick:()=>this.setState(v=>({frames:v.frames.map(f=>({...f, dur:n})), hint:'All frames set to '+n+' ms'})) })),
+
+      activeDur: s.frames[s.active].dur,
+      setDur: e => this.setDur(s.active, parseInt(e.target.value,10) || 100),
+      durUp: () => this.setDur(s.active, (s.frames[s.active].dur||100) + 20),
+      durDown: () => this.setDur(s.active, (s.frames[s.active].dur||100) - 20),
+
+      frameCount: s.frames.length,
+      totalMs: totalMs + ' ms',
+      addFrame: () => this.addFrame(),
+      dupFrame: () => this.dupFrame(),
+      dupTransform: () => this.dupFrame(null, () => this.setState(v=>({tfx:v.active}))),
+      delFrame: () => this.delFrame(),
+      stop: e => e.stopPropagation(),
+
+      menuOpen: !!menu,
+      menuX: menu ? menu.x : 0,
+      menuY: menu ? menu.y : 0,
+      menuTitle: menu ? ('Frame ' + (menu.i+1)) : '',
+      menuItems,
+      closeMenu: () => this.setState({menu:null}),
+
+      tfxOpen: s.tfx != null,
+      tfxTitle: s.tfx != null ? ('Frame ' + (s.tfx+1) + ' of ' + s.frames.length) : '',
+      tfxActions: tfxKinds.map(([kind,label]) => ({ label, click:()=>this.transformFrame(s.tfx, kind) })),
+      closeTfx: () => this.setState({tfx:null}),
+
+      dimText: s.size + ' × ' + s.size + ' px',
+      frameText: 'Frame ' + (s.active+1) + ' of ' + s.frames.length,
+      mirrorText: s.mirrorH && s.mirrorV ? 'Both' : s.mirrorH ? 'Horizontal' : s.mirrorV ? 'Vertical' : 'Off',
+      tileText: s.tile ? 'On' : 'Off',
+      onionText: s.onion.on ? (s.onion.prev + '←→' + s.onion.next) : 'Off',
+      coordText: s.hover ? ('X ' + String(s.hover.x).padStart(2,'0') + '  Y ' + String(s.hover.y).padStart(2,'0')) : 'X —  Y —',
+      hint: s.hint,
+
+      sheetOpen: s.sheetOpen,
+      openSheet: () => this.setState({sheetOpen:true}),
+      closeSheet: () => this.setState({sheetOpen:false}),
+      layouts: [['horizontal','Horizontal'],['vertical','Vertical'],['grid','Grid']].map(([id,label]) => ({
+        label, on:s.layout===id, pick:()=>this.setState({layout:id})
+      })),
+      isGrid: s.layout === 'grid',
+      cols: s.cols,
+      colsUp: () => this.setState(v=>({cols:Math.min(12, v.cols+1)})),
+      colsDown: () => this.setState(v=>({cols:Math.max(1, v.cols-1)})),
+      spacing: s.spacing,
+      padding: s.padding,
+      setSpacing: e => this.setState({spacing:+e.target.value}),
+      setPadding: e => this.setState({padding:+e.target.value}),
+      transparent: s.transparent,
+      setTransparent: e => this.setState({transparent:e.target.checked}),
+      exportScopes: [['all','All frames'],['anim','Current animation'],['selected','Checked frames']].map(([id,label]) => ({
+        label, on:s.exportScope===id, pick:()=>this.setState({exportScope:id})
+      })),
+      scopeNote: s.exportScope==='anim'
+        ? (this.activeTagObj() ? ('Animation: ' + this.activeTagObj().name + ' · frames ' + this.activeTagObj().start + '–' + this.activeTagObj().end) : 'No animation tag selected — exporting all frames')
+        : s.exportScope==='selected' ? 'Only frames with the checkbox ticked' : 'Every frame in the timeline',
+      showCells: s.showCells,
+      setShowCells: e => this.setState({showCells:e.target.checked}),
+      sheetFrames: g.list.length,
+      sheetDim: g.w + ' × ' + g.h,
+      exportSheet: () => this.exportSheet()
+    };
+  }
+}
+
+</script>
+</body>
+</html>
