@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "check": "node --check preview-sizing.js && node --check selection-model.js && node --check line-model.js && node --check test/preview-sizing.test.js && node --check test/selection-model.test.js && node --check test/line-model.test.js && node scripts/check.js",
+    "check": "node --check preview-sizing.js && node --check selection-model.js && node --check line-model.js && node --check paint-model.js && node --check test/preview-sizing.test.js && node --check test/selection-model.test.js && node --check test/line-model.test.js && node --check test/paint-model.test.js && node scripts/check.js",
     "test": "node --test"
   },
   "devDependencies": {
