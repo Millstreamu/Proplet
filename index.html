@@ -974,7 +974,7 @@ class Component extends React.Component {
       return;
     }
     if (k===' '){ e.preventDefault(); this.play(); return; }
-    if (k==='escape'){ this.commitFloatingSelection(); this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, tileSheetOpen:false, atlasSheetOpen:false}); return; }
+    if (k==='escape'){ this.commitFloatingSelection(); this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, sheetOpen:false, tileSheetOpen:false, atlasSheetOpen:false}); return; }
     if ((k==='delete' || k==='backspace') && this.state.selRect){ e.preventDefault(); this.selDelete(); return; }
     if (k.startsWith('arrow')){
       const d = { arrowleft:[-1,0], arrowright:[1,0], arrowup:[0,-1], arrowdown:[0,1] }[k];
@@ -2044,8 +2044,13 @@ class Component extends React.Component {
       shapeFill: s.shapeFill,
       toggleShapeFill: () => this.setState(v => ({ shapeFill:!v.shapeFill, hint:(v.shapeFill?'Shapes: outline':'Shapes: filled') })),
       hasPaintMode: ['pencil','line','rect','ellipse','fill'].includes(s.tool),
-      paintModes: [['solid','Solid colour'],['tint','Tint colour'],['darken','Darken'],['lighten','Lighten']].map(([id,label]) => ({
-        label, on:s.paintMode===id, pick:()=>this.setState({paintMode:id, hint:tool.name+' mode: '+label})
+      paintMode: s.paintMode,
+      paintModes: [['solid','Solid','Solid colour'],['tint','Tint','Tint colour'],['darken','Darken','Darken'],['lighten','Lighten','Lighten']].map(([id,short,label]) => ({
+        id, short, label,
+        icon: id==='solid'
+          ? React.createElement('svg',{width:16,height:16,viewBox:'0 0 24 24'}, React.createElement('circle',{cx:12,cy:12,r:6,fill:'currentColor'}))
+          : mkIcon(IC[id], false, 16),
+        on:s.paintMode===id, pick:()=>this.setState({paintMode:id, hint:tool.name+' mode: '+label})
       })),
 
       viewToggles: [
@@ -2209,6 +2214,16 @@ class Component extends React.Component {
       sheetOpen: s.sheetOpen,
       openSheet: () => this.setState({sheetOpen:true}),
       closeSheet: () => this.setState({sheetOpen:false}),
+
+      exportOpen: s.sheetOpen || s.tileSheetOpen || s.atlasSheetOpen,
+      exportTab: s.sheetOpen ? 'sheet' : s.tileSheetOpen ? 'tiles' : s.atlasSheetOpen ? 'atlas' : 'sheet',
+      exportSubtitle: s.tileSheetOpen ? 'Uniform tiles → tileset' : s.atlasSheetOpen ? 'Free-size sprites → atlas' : 'Animation frames → one sheet',
+      exportTabs: [['sheet','Sprite Sheet'],['tiles','Tile Set'],['atlas','Atlas']].map(([id,label]) => ({
+        id, label, on: (s.sheetOpen?'sheet':s.tileSheetOpen?'tiles':s.atlasSheetOpen?'atlas':'sheet')===id,
+        pick: () => this.setState({ sheetOpen:id==='sheet', tileSheetOpen:id==='tiles', atlasSheetOpen:id==='atlas' })
+      })),
+      closeExport: () => this.setState({ sheetOpen:false, tileSheetOpen:false, atlasSheetOpen:false }),
+      openExport: () => { const w=this.state.workspace; const tab = w==='tiles'?'tiles':w==='atlas'?'atlas':'sheet'; this.setState({ sheetOpen:tab==='sheet', tileSheetOpen:tab==='tiles', atlasSheetOpen:tab==='atlas' }); },
       layouts: [['horizontal','Horizontal'],['vertical','Vertical'],['grid','Grid']].map(([id,label]) => ({
         label, on:s.layout===id, pick:()=>this.setState({layout:id})
       })),
@@ -2270,8 +2285,7 @@ class Component extends React.Component {
 
           <div style={css("margin-left:auto;display:flex;align-items:center;gap:10px;flex:none;white-space:nowrap")}>
             <span style={css("font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-variant-numeric:tabular-nums")}>{R.frameCount} frames · {R.totalMs}</span>
-            <Hov onClick={R.openTileSheet} s="display:flex;align-items:center;gap:7px;padding:7px 11px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px;color:var(--dim)" sh="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M3 3h7v7H3z"></path><path d="M14 3h7v7h-7z"></path><path d="M3 14h7v7H3z"></path><path d="M14 14h7v7h-7z"></path></svg>Tile Set</Hov>
-            <button onClick={R.openSheet} className="btn btn-primary" style={css("gap:8px")}><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><rect x="3" y="3" width="18" height="18" rx="1"></rect><path d="M9 3v18"></path><path d="M15 3v18"></path><path d="M3 9h18"></path><path d="M3 15h18"></path></svg>Sprite Sheet</button>
+            <button onClick={R.openExport} className="btn btn-primary" style={css("gap:8px")}><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export</button>
           </div>
         </header>
 
@@ -2315,20 +2329,6 @@ class Component extends React.Component {
             </Hov>
           )}
 
-          {R.hasPaintMode && (
-            <div style={css("display:flex;align-items:center;gap:7px;flex:none;white-space:nowrap")}>
-              <span style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)")}>Paint</span>
-              <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
-                {R.paintModes.map((m,i)=>(
-                  <Hov key={i} onClick={m.pick} title={m.label+' with the '+R.toolName.toLowerCase()} s="position:relative;padding:4px 9px;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                    {m.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                    <span style={css("position:relative")}>{m.label}</span>
-                  </Hov>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={css("margin-left:auto;display:flex;align-items:center;gap:9px;flex:none;white-space:nowrap")}>
             <span style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)")}>Shading</span>
             <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
@@ -2344,14 +2344,28 @@ class Component extends React.Component {
 
         <div style={css("display:grid;grid-template-columns:auto 1fr auto;min-height:0")}>
 
-          <nav style={css("display:flex;flex-direction:column;gap:3px;padding:9px 7px;background:var(--bg1);border-right:1px solid var(--line)")}>
-            {R.tools.map((t,i)=>(
-              <Hov key={i} title={t.tip} onClick={t.pick} onMouseEnter={t.hover} onMouseLeave={R.clearHint} s="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--dim);cursor:pointer" sh="background:rgba(236,231,222,.07);color:var(--fg)">
-                {t.on && <span style={css("position:absolute;inset:0;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px")}></span>}
-                <span style={css("position:relative;display:block")}>{t.icon}</span>
-              </Hov>
-            ))}
-          </nav>
+          <div style={css("display:flex;background:var(--bg1)")}>
+            <nav style={css("display:flex;flex-direction:column;gap:3px;padding:9px 7px;border-right:1px solid var(--line)")}>
+              {R.tools.map((t,i)=>(
+                <Hov key={i} title={t.tip} onClick={t.pick} onMouseEnter={t.hover} onMouseLeave={R.clearHint} s="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--dim);cursor:pointer" sh="background:rgba(236,231,222,.07);color:var(--fg)">
+                  {t.on && <span style={css("position:absolute;inset:0;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px")}></span>}
+                  <span style={css("position:relative;display:block")}>{t.icon}</span>
+                </Hov>
+              ))}
+            </nav>
+            <div style={{...css("display:flex;flex-direction:column;overflow:hidden;transition:width .18s ease, opacity .18s ease"), width: R.hasPaintMode?'58px':'0px', opacity: R.hasPaintMode?1:0, pointerEvents: R.hasPaintMode?'auto':'none', borderRight: R.hasPaintMode?'1px solid var(--line)':'0'}}>
+              <div style={css("padding:9px 0 5px;text-align:center;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)")}>Paint</div>
+              <div style={css("display:flex;flex-direction:column;gap:3px;padding:0 7px 9px;align-items:center")}>
+                {R.paintModes.map((m,i)=>(
+                  <Hov key={i} onClick={m.pick} title={m.label} s="position:relative;width:44px;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--dim);cursor:pointer" sh="background:rgba(236,231,222,.07);color:var(--fg)">
+                    {m.on && <span style={css("position:absolute;inset:0;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px")}></span>}
+                    <span style={css("position:relative;display:block")}>{m.icon}</span>
+                    <span style={css("position:relative;font-size:7.5px;letter-spacing:.03em")}>{m.short}</span>
+                  </Hov>
+                ))}
+              </div>
+            </div>
+          </div>
 
           <main style={css("position:relative;display:flex;align-items:safe center;justify-content:safe center;min-width:0;min-height:0;overflow:auto;background:var(--bg0);background-image:radial-gradient(circle at 50% 40%, rgba(225,173,102,.05), transparent 60%)")}>
             <div style={css("padding:22px")}>
@@ -2745,16 +2759,29 @@ class Component extends React.Component {
           </div>
         )}
 
-        {R.sheetOpen && (
-          <div onClick={R.closeSheet} style={css("position:fixed;inset:0;background:rgba(10,9,7,.72);display:flex;align-items:center;justify-content:center;z-index:50")}>
-            <div onClick={R.stop} style={css("width:880px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)")}>
-              <div style={css("display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line)")}>
-                <div>
-                  <div style={css("font-family:'Cormorant Garamond',serif;font-size:23px;line-height:1.1")}>Sprite Sheet Manager</div>
-                  <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Arrange & export</div>
+        {R.exportOpen && (
+          <div onClick={R.closeExport} style={css("position:fixed;inset:0;background:rgba(10,9,7,.72);display:flex;align-items:center;justify-content:center;z-index:50")}>
+            <div onClick={R.stop} style={css("width:980px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)")}>
+              <div style={css("display:flex;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line)")}>
+                <div style={css("flex:none")}>
+                  <div style={css("font-family:'Cormorant Garamond',serif;font-size:22px;line-height:1.05")}>Export</div>
+                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:2px")}>{R.exportSubtitle}</div>
                 </div>
-                <Hov onClick={R.closeSheet} s="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sh="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></Hov>
+                <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;flex:none")}>
+                  {R.exportTabs.map((t,i)=>(
+                    <Hov key={i} onClick={t.pick} s="position:relative;padding:7px 14px;background:transparent;border:0;border-left:1px solid var(--line);font-size:11.5px;color:var(--dim);cursor:pointer;white-space:nowrap" sh="color:var(--fg)">
+                      {t.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                      <span style={css("position:relative")}>{t.label}</span>
+                    </Hov>
+                  ))}
+                </div>
+                <div style={css("margin-left:auto;display:flex;align-items:center;gap:9px;flex:none")}>
+                  <Hov onClick={R.exportPng} title="Export just the active frame / tile / sprite as a PNG" s="display:flex;align-items:center;gap:6px;padding:7px 11px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:11.5px;color:var(--dim)" sh="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="14" height="14" viewBox="0 0 24 24" className="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Current → PNG</Hov>
+                  <Hov onClick={R.closeExport} s="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sh="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></Hov>
+                </div>
               </div>
+
+              {R.exportTab==='sheet' && (
               <div style={css("display:grid;grid-template-columns:1fr 292px")}>
                 <div style={css("padding:20px;border-right:1px solid var(--line);min-width:0")}>
                   <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:10px")}>Live preview</div>
@@ -2840,135 +2867,9 @@ class Component extends React.Component {
                   <button onClick={R.exportSheet} className="btn btn-primary" style={css("margin-top:auto;width:100%;gap:8px;padding:10px")}><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export Sprite Sheet</button>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+              )}
 
-        {R.restoreOpen && (
-          <div style={css("position:fixed;right:16px;bottom:44px;z-index:80;width:288px;background:var(--bg2);border:1px solid var(--gold);border-radius:5px;box-shadow:0 20px 50px rgba(0,0,0,.6);padding:14px")}>
-            <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)")}>Restore previous session?</div>
-            <div style={css("font-family:'Cormorant Garamond',serif;font-size:20px;margin-top:6px;line-height:1.1")}>{R.restoreName}</div>
-            <div style={css("font-size:11px;color:var(--dim);margin-top:2px")}>{R.restoreWhen} · autosaved in this browser</div>
-            <div style={css("display:flex;gap:7px;margin-top:13px")}>
-              <Hov onClick={R.doRestore} s="flex:1;padding:7px;background:transparent;border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:12px;cursor:pointer" sh="background:rgba(225,173,102,.14)">Restore</Hov>
-              <Hov onClick={R.dismissRestore} s="flex:1;padding:7px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg);border-color:rgba(236,231,222,.3)">Start new</Hov>
-            </div>
-          </div>
-        )}
-
-        {R.newOpen && (
-          <div onClick={R.closeNew} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
-            <div onClick={R.stop} style={css("width:392px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)")}>
-              <div style={css("padding:15px 18px;border-bottom:1px solid var(--line)")}>
-                <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>New project</div>
-                <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Canvas & name</div>
-              </div>
-              <div style={css("padding:18px;display:flex;flex-direction:column;gap:14px")}>
-                <div>
-                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Project name</div>
-                  <input value={R.npName} onChange={R.setNpName} placeholder="player_walk" style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none")} />
-                </div>
-                <div>
-                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Canvas size</div>
-                  <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
-                    {R.npPresets.map((p,i)=>(
-                      <Hov key={i} onClick={p.pick} s="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:10.5px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums;white-space:nowrap" sh="color:var(--fg)">
-                        {p.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                        <span style={css("position:relative")}>{p.label}</span>
-                      </Hov>
-                    ))}
-                  </div>
-                  <div style={css("display:flex;align-items:center;gap:9px;margin-top:9px")}>
-                    <span style={css("font-size:11px;color:var(--dim);white-space:nowrap")}>Custom</span>
-                    <input value={R.npW} onChange={R.setNpW} style={css("width:52px;background:transparent;border:1px solid var(--line);border-radius:4px;padding:5px 8px;color:var(--fg);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
-                    <span style={css("font-size:12px;color:var(--dim)")}>×</span>
-                    <input value={R.npH} onChange={R.setNpH} style={css("width:52px;background:transparent;border:1px solid var(--line);border-radius:4px;padding:5px 8px;color:var(--fg);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
-                    <span style={css("font-size:11px;color:var(--dim)")}>px · 1–256</span>
-                  </div>
-                </div>
-                <label style={css("display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);cursor:pointer")}>
-                  <input type="checkbox" checked={R.npTransparent} onChange={R.setNpTransparent} style={css("width:14px;height:14px;accent-color:var(--gold);margin:0")} />Transparent background
-                </label>
-              </div>
-              <div style={css("display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px 18px")}>
-                <span style={css("font-size:10.5px;color:var(--dim);font-style:italic")}>This replaces the working project.</span>
-                <div style={css("display:flex;gap:7px")}>
-                  <Hov onClick={R.closeNew} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
-                  <button onClick={R.createProject} className="btn btn-primary">Create project</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {R.saveAsOpen && (
-          <div onClick={R.closeSaveAs} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
-            <div onClick={R.stop} style={css("width:376px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px")}>
-              <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>Save project as</div>
-              <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Downloads a .pixelproj file</div>
-              <div style={css("display:flex;align-items:center;gap:8px;margin-top:15px")}>
-                <input value={R.saveAsName} onChange={R.setSaveAsName} style={css("flex:1;min-width:0;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none")} />
-                <span style={css("font-size:12px;color:var(--dim)")}>.pixelproj</span>
-              </div>
-              <div style={css("font-size:10.5px;color:var(--dim);font-style:italic;margin-top:9px")}>{R.autoStatus} — the project file is a separate, portable copy.</div>
-              <div style={css("display:flex;justify-content:flex-end;gap:7px;margin-top:16px")}>
-                <Hov onClick={R.closeSaveAs} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
-                <button onClick={R.confirmSaveAs} className="btn btn-primary">Save project</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {R.tagEditOpen && (
-          <div onClick={R.closeTagEdit} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
-            <div onClick={R.stop} style={css("width:392px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px")}>
-              <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>{R.tagEditTitle}</div>
-              <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Frame range & playback</div>
-              <div style={css("display:flex;flex-direction:column;gap:13px;margin-top:16px")}>
-                <div>
-                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Name</div>
-                  <input value={R.teName} onChange={R.setTeName} placeholder="Walk" style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none")} />
-                </div>
-                <div style={css("display:flex;gap:11px")}>
-                  <div style={css("flex:1")}>
-                    <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Start frame</div>
-                    <input value={R.teStart} onChange={R.setTeStart} style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
-                  </div>
-                  <div style={css("flex:1")}>
-                    <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>End frame</div>
-                    <input value={R.teEnd} onChange={R.setTeEnd} style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
-                  </div>
-                </div>
-                <div>
-                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Playback</div>
-                  <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
-                    {R.teModes.map((m,i)=>(
-                      <Hov key={i} onClick={m.pick} s="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                        {m.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                        <span style={css("position:relative")}>{m.label}</span>
-                      </Hov>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div style={css("display:flex;justify-content:flex-end;gap:7px;margin-top:17px")}>
-                <Hov onClick={R.closeTagEdit} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
-                <button onClick={R.saveTag} className="btn btn-primary">Save tag</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {R.tileSheetOpen && (
-          <div onClick={R.closeTileSheet} style={css("position:fixed;inset:0;background:rgba(10,9,7,.72);display:flex;align-items:center;justify-content:center;z-index:50")}>
-            <div onClick={R.stop} style={css("width:980px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)")}>
-              <div style={css("display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line)")}>
-                <div>
-                  <div style={css("font-family:'Cormorant Garamond',serif;font-size:23px;line-height:1.1")}>Tile Set Manager</div>
-                  <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Arrange & export tiles</div>
-                </div>
-                <Hov onClick={R.closeTileSheet} s="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sh="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></Hov>
-              </div>
+              {R.exportTab==='tiles' && (
               <div style={css("display:grid;grid-template-columns:1fr 292px")}>
                 <div style={css("padding:20px;border-right:1px solid var(--line);min-width:0")}>
                   <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:10px")}>Sheet preview</div>
@@ -3116,20 +3017,9 @@ class Component extends React.Component {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+              )}
 
-        {R.atlasSheetOpen && (
-          <div onClick={R.closeAtlasSheet} style={css("position:fixed;inset:0;background:rgba(10,9,7,.72);display:flex;align-items:center;justify-content:center;z-index:50")}>
-            <div onClick={R.stop} style={css("width:900px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)")}>
-              <div style={css("display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--line)")}>
-                <div>
-                  <div style={css("font-family:'Cormorant Garamond',serif;font-size:23px;line-height:1.1")}>Atlas Packer</div>
-                  <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Nest free-size sprites into one sheet</div>
-                </div>
-                <Hov onClick={R.closeAtlasSheet} s="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sh="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></Hov>
-              </div>
+              {R.exportTab==='atlas' && (
               <div style={css("display:grid;grid-template-columns:1fr 300px")}>
                 <div style={css("padding:20px;border-right:1px solid var(--line);min-width:0")}>
                   <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:10px")}>
@@ -3219,6 +3109,122 @@ class Component extends React.Component {
                     <Hov onClick={R.exportAtlasMeta} s="width:100%;padding:8px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11.5px;cursor:pointer" sh="color:var(--fg);border-color:rgba(236,231,222,.3)">Export atlas.json metadata</Hov>
                   </div>
                 </div>
+              </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {R.restoreOpen && (
+          <div style={css("position:fixed;right:16px;bottom:44px;z-index:80;width:288px;background:var(--bg2);border:1px solid var(--gold);border-radius:5px;box-shadow:0 20px 50px rgba(0,0,0,.6);padding:14px")}>
+            <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)")}>Restore previous session?</div>
+            <div style={css("font-family:'Cormorant Garamond',serif;font-size:20px;margin-top:6px;line-height:1.1")}>{R.restoreName}</div>
+            <div style={css("font-size:11px;color:var(--dim);margin-top:2px")}>{R.restoreWhen} · autosaved in this browser</div>
+            <div style={css("display:flex;gap:7px;margin-top:13px")}>
+              <Hov onClick={R.doRestore} s="flex:1;padding:7px;background:transparent;border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-size:12px;cursor:pointer" sh="background:rgba(225,173,102,.14)">Restore</Hov>
+              <Hov onClick={R.dismissRestore} s="flex:1;padding:7px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg);border-color:rgba(236,231,222,.3)">Start new</Hov>
+            </div>
+          </div>
+        )}
+
+        {R.newOpen && (
+          <div onClick={R.closeNew} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
+            <div onClick={R.stop} style={css("width:392px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6)")}>
+              <div style={css("padding:15px 18px;border-bottom:1px solid var(--line)")}>
+                <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>New project</div>
+                <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Canvas & name</div>
+              </div>
+              <div style={css("padding:18px;display:flex;flex-direction:column;gap:14px")}>
+                <div>
+                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Project name</div>
+                  <input value={R.npName} onChange={R.setNpName} placeholder="player_walk" style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none")} />
+                </div>
+                <div>
+                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Canvas size</div>
+                  <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
+                    {R.npPresets.map((p,i)=>(
+                      <Hov key={i} onClick={p.pick} s="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:10.5px;color:var(--dim);cursor:pointer;font-variant-numeric:tabular-nums;white-space:nowrap" sh="color:var(--fg)">
+                        {p.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                        <span style={css("position:relative")}>{p.label}</span>
+                      </Hov>
+                    ))}
+                  </div>
+                  <div style={css("display:flex;align-items:center;gap:9px;margin-top:9px")}>
+                    <span style={css("font-size:11px;color:var(--dim);white-space:nowrap")}>Custom</span>
+                    <input value={R.npW} onChange={R.setNpW} style={css("width:52px;background:transparent;border:1px solid var(--line);border-radius:4px;padding:5px 8px;color:var(--fg);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
+                    <span style={css("font-size:12px;color:var(--dim)")}>×</span>
+                    <input value={R.npH} onChange={R.setNpH} style={css("width:52px;background:transparent;border:1px solid var(--line);border-radius:4px;padding:5px 8px;color:var(--fg);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
+                    <span style={css("font-size:11px;color:var(--dim)")}>px · 1–256</span>
+                  </div>
+                </div>
+                <label style={css("display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);cursor:pointer")}>
+                  <input type="checkbox" checked={R.npTransparent} onChange={R.setNpTransparent} style={css("width:14px;height:14px;accent-color:var(--gold);margin:0")} />Transparent background
+                </label>
+              </div>
+              <div style={css("display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px 18px")}>
+                <span style={css("font-size:10.5px;color:var(--dim);font-style:italic")}>This replaces the working project.</span>
+                <div style={css("display:flex;gap:7px")}>
+                  <Hov onClick={R.closeNew} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
+                  <button onClick={R.createProject} className="btn btn-primary">Create project</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {R.saveAsOpen && (
+          <div onClick={R.closeSaveAs} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
+            <div onClick={R.stop} style={css("width:376px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px")}>
+              <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>Save project as</div>
+              <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Downloads a .pixelproj file</div>
+              <div style={css("display:flex;align-items:center;gap:8px;margin-top:15px")}>
+                <input value={R.saveAsName} onChange={R.setSaveAsName} style={css("flex:1;min-width:0;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none")} />
+                <span style={css("font-size:12px;color:var(--dim)")}>.pixelproj</span>
+              </div>
+              <div style={css("font-size:10.5px;color:var(--dim);font-style:italic;margin-top:9px")}>{R.autoStatus} — the project file is a separate, portable copy.</div>
+              <div style={css("display:flex;justify-content:flex-end;gap:7px;margin-top:16px")}>
+                <Hov onClick={R.closeSaveAs} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
+                <button onClick={R.confirmSaveAs} className="btn btn-primary">Save project</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {R.tagEditOpen && (
+          <div onClick={R.closeTagEdit} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
+            <div onClick={R.stop} style={css("width:392px;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px")}>
+              <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>{R.tagEditTitle}</div>
+              <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>Frame range & playback</div>
+              <div style={css("display:flex;flex-direction:column;gap:13px;margin-top:16px")}>
+                <div>
+                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Name</div>
+                  <input value={R.teName} onChange={R.setTeName} placeholder="Walk" style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;outline:none")} />
+                </div>
+                <div style={css("display:flex;gap:11px")}>
+                  <div style={css("flex:1")}>
+                    <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Start frame</div>
+                    <input value={R.teStart} onChange={R.setTeStart} style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
+                  </div>
+                  <div style={css("flex:1")}>
+                    <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>End frame</div>
+                    <input value={R.teEnd} onChange={R.setTeEnd} style={css("width:100%;background:transparent;border:1px solid var(--line);border-radius:4px;padding:7px 9px;color:var(--fg);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none")} />
+                  </div>
+                </div>
+                <div>
+                  <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>Playback</div>
+                  <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
+                    {R.teModes.map((m,i)=>(
+                      <Hov key={i} onClick={m.pick} s="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
+                        {m.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                        <span style={css("position:relative")}>{m.label}</span>
+                      </Hov>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={css("display:flex;justify-content:flex-end;gap:7px;margin-top:17px")}>
+                <Hov onClick={R.closeTagEdit} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
+                <button onClick={R.saveTag} className="btn btn-primary">Save tag</button>
               </div>
             </div>
           </div>
