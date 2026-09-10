@@ -39,6 +39,7 @@ input{font-family:inherit}
 <script src="preview-sizing.js"></script>
 <script src="selection-model.js"></script>
 <script src="line-model.js"></script>
+<script src="paint-model.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -137,9 +138,6 @@ const TOOLS = [
   {id:'line', name:'Line', key:'N', paths:IC.line, hint:'Line — drag between endpoints · Shift = horizontal, vertical, or 45°'},
   {id:'rect', name:'Rectangle', key:'R', paths:IC.rect, hint:'Rectangle — drag to draw · Shift = square · Alt = filled'},
   {id:'ellipse', name:'Ellipse', key:'C', paths:IC.ellipse, hint:'Ellipse — drag to draw · Shift = circle · Alt = filled'},
-  {id:'lighten', name:'Lighten', key:'L', paths:IC.lighten, circle:true},
-  {id:'darken', name:'Darken', key:'D', paths:IC.darken},
-  {id:'tint', name:'Tint', key:'X', paths:IC.tint, hint:'Tint — brush the selected colour into existing pixels'},
   {id:'move', name:'Move', key:'M', paths:IC.move},
   {id:'select', name:'Selection', key:'S', paths:IC.select}
 ];
@@ -219,7 +217,7 @@ class Component extends React.Component {
       exportScope:'all',
       fg:'#c2417a', bg:'#15130f', palette:PALETTE.slice(), recent:['#c2417a','#f07fae','#6fb0c9','#a8763f'],
       ramps:RAMPS.map(r=>({...r, colors:r.colors.slice()})),
-      shadeMode: p.shadeModeDefault === 'Basic RGB' ? 'rgb' : 'ramp',
+      shadeMode: p.shadeModeDefault === 'Basic RGB' ? 'rgb' : 'ramp', paintMode:'solid',
       cell:15, grid:p.showGridDefault !== false, tile:!!p.tileDefault,
       mirrorH:false, mirrorV:false, shapeFill:false,
       onion:{ on:!!p.onionDefault, prev:1, next:1, opacity:p.onionOpacityDefault || 35 },
@@ -660,24 +658,19 @@ class Component extends React.Component {
 
   /* ── drawing ── */
   applyOne(x, y){
-    const { tool, fg } = this.state;
+    const { tool, fg, paintMode } = this.state;
     const d = this.dims(), W = d.w;
     const px = this.curPx();
     const i = y*W+x;
-    if (tool==='pencil') px[i] = fg;
+    if (tool==='pencil'){
+      if (this.stroked.has(i)) return;
+      this.stroked.add(i);
+      px[i] = PixelStudioPaint.applyPaintMode(px[i], fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix);
+    }
     else if (tool==='eraser') px[i] = null;
     else if (tool==='picker'){ if (px[i]) this.pickColor(px[i]); }
-    else if (tool==='fill') this.flood(px, W, d.h, x, y, fg);
-    else if (tool==='lighten' || tool==='darken'){
-      if (this.stroked.has(i) || !px[i]) return;
-      this.stroked.add(i);
-      px[i] = this.rampStep(px[i], tool==='lighten' ? 1 : -1);
-    }
-    else if (tool==='tint'){
-      if (this.stroked.has(i) || !px[i]) return;
-      this.stroked.add(i);
-      px[i] = mix(px[i], fg, 0.35);
-    }
+    else if (tool==='fill') PixelStudioPaint.floodPaint(px, W, d.h, x, y,
+      current => PixelStudioPaint.applyPaintMode(current, fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix));
   }
   apply(x,y){
     const { tool } = this.state;
@@ -818,8 +811,9 @@ class Component extends React.Component {
     const px = this.curPx();
     const base = this.shapeBase;
     if (base) for (let i=0;i<px.length;i++) px[i] = base[i];
-    const d = this.dims(), W = d.w, H = d.h, fg = this.state.fg;
-    const plot = (x,y) => { this.mirrorPts(x,y).forEach(([mx,my]) => { if (mx>=0 && mx<W && my>=0 && my<H) px[my*W+mx] = fg; }); };
+    const d = this.dims(), W = d.w, H = d.h, fg = this.state.fg, paintMode = this.state.paintMode;
+    const plotted = new Set();
+    const plot = (x,y) => { this.mirrorPts(x,y).forEach(([mx,my]) => { const i=my*W+mx; if (mx>=0 && mx<W && my>=0 && my<H && !plotted.has(i)){ plotted.add(i); px[i] = PixelStudioPaint.applyPaintMode(px[i], fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix); } }); };
     let x0=a.x, y0=a.y, x1=b.x, y1=b.y;
     if (this.state.tool === 'line'){
       const end = e && e.shiftKey ? PixelStudioLine.snapEndpoint(a, b) : b;
@@ -989,8 +983,9 @@ class Component extends React.Component {
       if (k==='arrowleft') this.setState(s=>({active:(s.active-1+s.frames.length)%s.frames.length}));
       return;
     }
-    const map = { p:'pencil', e:'eraser', i:'picker', f:'fill', n:'line', r:'rect', c:'ellipse', l:'lighten', d:'darken', x:'tint', m:'move', s:'select' };
+    const map = { p:'pencil', e:'eraser', i:'picker', f:'fill', n:'line', r:'rect', c:'ellipse', m:'move', s:'select' };
     if (map[k]){ const tl = TOOLS.find(x=>x.id===map[k]); this.commitFloatingSelection(); this.setState({tool:map[k], hint:tl.hint||tl.name}); }
+    else if ({l:'lighten',d:'darken',x:'tint'}[k]) this.setState({paintMode:{l:'lighten',d:'darken',x:'tint'}[k]});
     else if (k==='g') this.setState(v=>({grid:!v.grid}));
     else if (k==='t') this.setState(v=>({tile:!v.tile}), ()=>this.fit());
     else if (k==='w') this.setState(v=>({wrap:!v.wrap, hint:v.wrap?'Wrap drawing off':'Wrap drawing on — paint past an edge and it wraps'}));
@@ -1208,7 +1203,7 @@ class Component extends React.Component {
       format:'pixelproj', version:1, name:s.projectName, w:s.w, h:s.h,
       frames:s.frames.map(f=>({ id:f.id, px:f.px, sel:f.sel, dur:f.dur })),
       tags:s.tags, activeTag:s.activeTag,
-      palette:s.palette, ramps:s.ramps, recent:s.recent, shadeMode:s.shadeMode,
+      palette:s.palette, ramps:s.ramps, recent:s.recent, shadeMode:s.shadeMode, paintMode:s.paintMode,
       mirror:{ h:s.mirrorH, v:s.mirrorV },
       tileSettings:{ on:s.tile, wrap:s.wrap, preview:s.tilePreview },
       onion:s.onion,
@@ -1233,7 +1228,7 @@ class Component extends React.Component {
       tags: d.tags || [], activeTag: d.activeTag || null,
       palette: d.palette || PALETTE.slice(),
       ramps: d.ramps || RAMPS.map(r=>({...r, colors:r.colors.slice()})),
-      recent: d.recent || [], shadeMode: d.shadeMode || 'ramp',
+      recent: d.recent || [], shadeMode: d.shadeMode || 'ramp', paintMode:d.paintMode || 'solid',
       mirrorH: !!(d.mirror && d.mirror.h), mirrorV: !!(d.mirror && d.mirror.v),
       tile: !!ts.on, wrap: !!ts.wrap, tilePreview: ts.preview || 3,
       onion: d.onion || { on:false, prev:1, next:1, opacity:35 },
@@ -2048,6 +2043,10 @@ class Component extends React.Component {
       isShapeTool: s.tool === 'rect' || s.tool === 'ellipse',
       shapeFill: s.shapeFill,
       toggleShapeFill: () => this.setState(v => ({ shapeFill:!v.shapeFill, hint:(v.shapeFill?'Shapes: outline':'Shapes: filled') })),
+      hasPaintMode: ['pencil','line','rect','ellipse','fill'].includes(s.tool),
+      paintModes: [['solid','Solid colour'],['tint','Tint colour'],['darken','Darken'],['lighten','Lighten']].map(([id,label]) => ({
+        label, on:s.paintMode===id, pick:()=>this.setState({paintMode:id, hint:tool.name+' mode: '+label})
+      })),
 
       viewToggles: [
         { label:'Grid', tip:'Pixel grid — G', on:s.grid, icon:mkIcon(IC.grid, false, 14), click:()=>this.setState(v=>({grid:!v.grid})) },
@@ -2314,6 +2313,20 @@ class Component extends React.Component {
               {R.shapeFill && <span style={css("position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px")}></span>}
               <span style={css("position:relative")}>{R.shapeFill ? 'Filled' : 'Outline'}</span>
             </Hov>
+          )}
+
+          {R.hasPaintMode && (
+            <div style={css("display:flex;align-items:center;gap:7px;flex:none;white-space:nowrap")}>
+              <span style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)")}>Paint</span>
+              <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
+                {R.paintModes.map((m,i)=>(
+                  <Hov key={i} onClick={m.pick} title={m.label+' with the '+R.toolName.toLowerCase()} s="position:relative;padding:4px 9px;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
+                    {m.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                    <span style={css("position:relative")}>{m.label}</span>
+                  </Hov>
+                ))}
+              </div>
+            </div>
           )}
 
           <div style={css("margin-left:auto;display:flex;align-items:center;gap:9px;flex:none;white-space:nowrap")}>
