@@ -37,6 +37,7 @@ input{font-family:inherit}
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
 <script src="preview-sizing.js"></script>
+<script src="selection-model.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -576,8 +577,8 @@ class Component extends React.Component {
     this.markDirty();
   }
   cap(){ return { frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, selRect:this.state.selRect }; }
-  undo(){ if (!this.undoStack.length) return; this.redoStack.push(this.cap()); this.setState(this.undoStack.pop()); }
-  redo(){ if (!this.redoStack.length) return; this.undoStack.push(this.cap()); this.setState(this.redoStack.pop()); }
+  undo(){ if (!this.undoStack.length) return; this.commitFloatingSelection(); this.redoStack.push(this.cap()); this.setState(this.undoStack.pop()); }
+  redo(){ if (!this.redoStack.length) return; this.commitFloatingSelection(); this.undoStack.push(this.cap()); this.setState(this.redoStack.pop()); }
 
   /* ── pixel helpers ── */
   cellAt(e){
@@ -646,6 +647,13 @@ class Component extends React.Component {
     return { w:s.w, h:s.h };
   }
   touch(){ this.forceUpdate(); this.markDirty(); }
+
+  renderFloatingSelection(selection){
+    const d = this.dims(), px = this.curPx();
+    const composite = PixelStudioSelection.composite(selection, d.w, d.h);
+    for (let i=0;i<px.length;i++) px[i] = composite[i];
+  }
+  commitFloatingSelection(){ this.floatingSelection = null; }
 
   /* ── drawing ── */
   applyOne(x, y){
@@ -720,12 +728,14 @@ class Component extends React.Component {
       const r = s.selRect;
       if (r && p.x>=r.x && p.x<r.x+r.w && p.y>=r.y && p.y<r.y+r.h){
         this.selMode = 'move';
-        this.selBuf = this.grab(this.curPx(), r);
-        const base = this.curPx().slice();
-        this.clearRegion(base, r);
+        const floating = this.floatingSelection;
+        this.selBuf = floating ? floating.pixels.slice() : this.grab(this.curPx(), r);
+        const base = floating ? floating.basePixels.slice() : this.curPx().slice();
+        if (!floating) this.clearRegion(base, r);
         this.selBase = base; this.selOrigin = {x:r.x, y:r.y}; this.selFrom = p;
         this.setState({hint:'Dragging the selection — arrow keys nudge by one pixel'});
       } else {
+        this.commitFloatingSelection();
         this.selMode = 'new';
         this.selAnchor = p;
         this.setState({selRect:{x:p.x, y:p.y, w:1, h:1}, hint:'Drag out a selection'});
@@ -770,7 +780,10 @@ class Component extends React.Component {
         const px = this.curPx();
         for (let i=0;i<px.length;i++) px[i] = this.selBase[i];
         const r = { x:this.selOrigin.x+dx, y:this.selOrigin.y+dy, w:this.state.selRect.w, h:this.state.selRect.h };
-        this.put(px, r, this.selBuf);
+        if (this.floatingSelection){
+          this.floatingSelection = PixelStudioSelection.move(this.floatingSelection, r.x, r.y);
+          this.renderFloatingSelection(this.floatingSelection);
+        } else this.put(px, r, this.selBuf);
         this.setState({selRect:r});
       }
       return;
@@ -860,19 +873,25 @@ class Component extends React.Component {
     this.snap();
     const r = this.state.selRect || {x:0,y:0};
     const rect = { x:r.x, y:r.y, w:cl.w, h:cl.h };
-    this.put(this.curPx(), rect, cl.buf);
+    this.floatingSelection = PixelStudioSelection.create(this.curPx(), rect, cl.buf);
+    this.renderFloatingSelection(this.floatingSelection);
     this.setState({ selRect:rect, hint:'Pasted at '+rect.x+', '+rect.y });
   }
   selDelete(){
     const r = this.state.selRect; if (!r) return;
     this.snap();
-    this.clearRegion(this.curPx(), r);
+    if (this.floatingSelection){
+      const px = this.curPx(), base = this.floatingSelection.basePixels;
+      for (let i=0;i<px.length;i++) px[i] = base[i];
+      this.floatingSelection = null;
+    } else this.clearRegion(this.curPx(), r);
     this.setState({hint:'Cleared selection'});
   }
   selTransform(kind){
     const r = this.state.selRect; if (!r) return;
     this.snap();
-    const buf = this.grab(this.curPx(), r);
+    const floating = this.floatingSelection;
+    const buf = floating ? floating.pixels.slice() : this.grab(this.curPx(), r);
     let out = buf, rect = r;
     if (kind==='flipH'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[y*r.w+(r.w-1-x)]; }
     else if (kind==='flipV'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[(r.h-1-y)*r.w+x]; }
@@ -882,14 +901,26 @@ class Component extends React.Component {
       rect = { x:r.x, y:r.y, w:r.h, h:r.w };
     }
     const px = this.curPx();
-    this.clearRegion(px, r);
-    this.put(px, rect, out);
+    if (floating){
+      this.floatingSelection = PixelStudioSelection.create(floating.basePixels, rect, out);
+      this.renderFloatingSelection(this.floatingSelection);
+    } else {
+      this.clearRegion(px, r);
+      this.put(px, rect, out);
+    }
     this.setState({selRect:rect});
   }
   nudge(dx,dy){
     const r = this.state.selRect; if (!r) return;
     this.snap();
     const px = this.curPx();
+    if (this.floatingSelection){
+      const rect = { x:r.x+dx, y:r.y+dy, w:r.w, h:r.h };
+      this.floatingSelection = PixelStudioSelection.move(this.floatingSelection, rect.x, rect.y);
+      this.renderFloatingSelection(this.floatingSelection);
+      this.setState({selRect:rect, hint:'Nudged selection'});
+      return;
+    }
     const buf = this.grab(px, r);
     this.clearRegion(px, r);
     const rect = { x:r.x+dx, y:r.y+dy, w:r.w, h:r.h };
@@ -937,7 +968,7 @@ class Component extends React.Component {
       return;
     }
     if (k===' '){ e.preventDefault(); this.play(); return; }
-    if (k==='escape'){ this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, tileSheetOpen:false, atlasSheetOpen:false}); return; }
+    if (k==='escape'){ this.commitFloatingSelection(); this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, tileSheetOpen:false, atlasSheetOpen:false}); return; }
     if ((k==='delete' || k==='backspace') && this.state.selRect){ e.preventDefault(); this.selDelete(); return; }
     if (k.startsWith('arrow')){
       const d = { arrowleft:[-1,0], arrowright:[1,0], arrowup:[0,-1], arrowdown:[0,1] }[k];
@@ -947,7 +978,7 @@ class Component extends React.Component {
       return;
     }
     const map = { p:'pencil', e:'eraser', i:'picker', f:'fill', r:'rect', c:'ellipse', l:'lighten', d:'darken', x:'tint', m:'move', s:'select' };
-    if (map[k]){ const tl = TOOLS.find(x=>x.id===map[k]); this.setState({tool:map[k], hint:tl.hint||tl.name}); }
+    if (map[k]){ const tl = TOOLS.find(x=>x.id===map[k]); this.commitFloatingSelection(); this.setState({tool:map[k], hint:tl.hint||tl.name}); }
     else if (k==='g') this.setState(v=>({grid:!v.grid}));
     else if (k==='t') this.setState(v=>({tile:!v.tile}), ()=>this.fit());
     else if (k==='w') this.setState(v=>({wrap:!v.wrap, hint:v.wrap?'Wrap drawing off':'Wrap drawing on — paint past an edge and it wraps'}));
@@ -1997,7 +2028,7 @@ class Component extends React.Component {
         tip: t.name + ' — ' + t.key,
         on: s.tool === t.id,
         icon: mkIcon(t.paths, t.circle),
-        pick: () => this.setState({tool:t.id, hint:t.hint||t.name}),
+        pick: () => { this.commitFloatingSelection(); this.setState({tool:t.id, hint:t.hint||t.name}); },
         hover: () => this.setState({hint:t.hint || (t.name + '  ·  ' + t.key)})
       })),
       clearHint: () => this.setState({hint:''}),
