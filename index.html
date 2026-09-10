@@ -893,16 +893,20 @@ class Component extends React.Component {
     const floating = this.floatingSelection;
     const buf = floating ? floating.pixels.slice() : this.grab(this.curPx(), r);
     let out = buf, rect = r;
-    if (kind==='flipH'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[y*r.w+(r.w-1-x)]; }
-    else if (kind==='flipV'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[(r.h-1-y)*r.w+x]; }
-    else if (kind==='rot'){
-      out = new Array(r.w*r.h).fill(null);
-      for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[x*r.h+(r.h-1-y)] = buf[y*r.w+x];
-      rect = { x:r.x, y:r.y, w:r.h, h:r.w };
+    if (floating){
+      this.floatingSelection = PixelStudioSelection.transform(floating, kind);
+      rect = this.floatingSelection.rect;
+    } else {
+      if (kind==='flipH'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[y*r.w+(r.w-1-x)]; }
+      else if (kind==='flipV'){ out = new Array(r.w*r.h).fill(null); for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[y*r.w+x]=buf[(r.h-1-y)*r.w+x]; }
+      else if (kind==='rot'){
+        out = new Array(r.w*r.h).fill(null);
+        for(let y=0;y<r.h;y++)for(let x=0;x<r.w;x++) out[x*r.h+(r.h-1-y)] = buf[y*r.w+x];
+        rect = { x:r.x, y:r.y, w:r.h, h:r.w };
+      }
     }
     const px = this.curPx();
     if (floating){
-      this.floatingSelection = PixelStudioSelection.create(floating.basePixels, rect, out);
       this.renderFloatingSelection(this.floatingSelection);
     } else {
       this.clearRegion(px, r);
