@@ -311,6 +311,7 @@ class Component extends React.Component {
     this.tick = setInterval(() => { if (this.state.autoAt || this.state.savedAt) this.forceUpdate(); }, 15000);
     this.beforeUnload = e => { if (this.state.dirty){ this.autosave(); } };
     window.addEventListener('beforeunload', this.beforeUnload);
+    this.installApi();
     this.paint();
   }
   componentWillUnmount(){
@@ -319,8 +320,56 @@ class Component extends React.Component {
     window.removeEventListener('beforeunload', this.beforeUnload);
     if (this.ro) this.ro.disconnect();
     clearTimeout(this.timer); clearTimeout(this.autoTimer); clearInterval(this.tick);
+    try { if (window.proplet && window.proplet.__owner === this) delete window.proplet; } catch(e){}
   }
   componentDidUpdate(){ if (this.autoFit !== false) this.fit(); this.paint(); }
+
+  /* ── scripting API — window.proplet — read/write pixels directly, no UI simulation.
+     Works on the CURRENT surface (active frame, tile, or atlas sprite, per workspace). ── */
+  installApi(){
+    const self = this;
+    const norm = c => (typeof c === 'string' && c) ? (c[0] === '#' ? c : '#' + c) : null;
+    const repaint = () => { self.forceUpdate(); self.markDirty(); };
+    const api = {
+      __owner: this, version: 1,
+      help: () => Object.keys(api).filter(k => k[0] !== '_'),
+      info: () => { const s = self.state, d = self.dims(); return { workspace:s.workspace, w:d.w, h:d.h, fg:s.fg, tool:s.tool, paintMode:s.paintMode, frames:s.frames.length, activeFrame:s.active, tiles:s.tiles.length, activeTile:s.activeTile, sprites:s.atlas.length, activeSprite:s.activeAtlas }; },
+      dims: () => ({ ...self.dims() }),
+      getPixels: () => { const d = self.dims(); return { w:d.w, h:d.h, px: self.curPx().slice() }; },
+
+      setPixels: (px, w, h) => {
+        if (!Array.isArray(px)) throw new Error('setPixels(px[, w, h]): px must be an array of hex strings or null');
+        if (w && h && (w !== self.dims().w || h !== self.dims().h)) self.resizeCurrent(w, h);
+        const d = self.dims();
+        if (px.length !== d.w * d.h) throw new Error('setPixels: px.length (' + px.length + ') must equal w*h (' + (d.w * d.h) + '). Pass w,h to resize first.');
+        self.snap();
+        const cur = self.curPx();
+        for (let i = 0; i < cur.length; i++) cur[i] = norm(px[i]);
+        repaint();
+        return { w:d.w, h:d.h };
+      },
+      setPixel: (x, y, color) => { const d = self.dims(); if (x < 0 || y < 0 || x >= d.w || y >= d.h) return false; self.snap(); self.curPx()[y * d.w + x] = norm(color); repaint(); return true; },
+      fillRect: (x, y, w, h, color) => { const d = self.dims(); self.snap(); const cur = self.curPx(), c = norm(color); for (let yy = Math.max(0, y); yy < Math.min(d.h, y + h); yy++) for (let xx = Math.max(0, x); xx < Math.min(d.w, x + w); xx++) cur[yy * d.w + xx] = c; repaint(); return true; },
+      clear: () => { self.snap(); self.curPx().fill(null); repaint(); return true; },
+      setColor: (hex) => { if (/^#?[0-9a-fA-F]{6}$/.test(hex)) self.setState({ fg: norm(hex) }); return self.state.fg; },
+
+      resize: (w, h) => { self.resizeCurrent(w, h); return self.dims(); },
+      newProject: (opts = {}) => new Promise(res => { const { w = 32, h = 16, name = 'untitled', transparent = true } = opts; self.setState({ npName:name, npW:w, npH:h, npTransparent:transparent }, () => { self.createProject(); res(api.info()); }); }),
+      setWorkspace: (ws) => { if (['frames','tiles','atlas'].includes(ws)) self.setState({ workspace:ws, tile: ws === 'tiles' }, () => self.fit()); return ws; },
+      addFrame: () => { self.addFrame(); return self.state.frames.length; },
+      setFrame: (i) => { self.setState({ active: Math.max(0, Math.min(self.state.frames.length - 1, i | 0)) }); return i; },
+      addTile: (name) => { self.addTile(); if (name) self.setState(s => { const t = s.tiles.slice(); t[s.activeTile] = {...t[s.activeTile], name}; return { tiles:t }; }); return self.state.tiles.length; },
+      addSprite: (opts = {}) => new Promise(res => { self.addAtlasItem(); setTimeout(() => { const i = self.state.activeAtlas, { w, h, name } = opts; if (w && h) self.setAtlasDims(i, w, h); if (name) self.setState(s => { const a = s.atlas.slice(); a[i] = {...a[i], name}; return { atlas:a }; }); res(i); }, 0); }),
+
+      loadImage: (src) => new Promise((res, rej) => { const img = new Image(); img.onload = () => { const d = self.dims(), tmp = document.createElement('canvas'); tmp.width = d.w; tmp.height = d.h; const c = tmp.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(img, 0, 0, d.w, d.h); const dd = c.getImageData(0, 0, d.w, d.h).data; self.snap(); const cur = self.curPx(); for (let i = 0; i < d.w * d.h; i++) cur[i] = dd[i*4+3] > 24 ? rgb2hex(dd[i*4], dd[i*4+1], dd[i*4+2]) : null; repaint(); res({ w:d.w, h:d.h }); }; img.onerror = () => rej(new Error('could not load image')); img.src = src; }),
+      loadProject: (json) => { self.loadProject(typeof json === 'string' ? JSON.parse(json) : json, false); return api.info(); },
+      toJSON: () => self.serialize(),
+      exportPNG: () => { self.exportPng(); },
+      undo: () => { self.undo(); return true; },
+      redo: () => { self.redo(); return true; }
+    };
+    window.proplet = api;
+  }
 
   fit(){
     const cv = this.mainRef.current;
