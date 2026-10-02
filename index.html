@@ -214,6 +214,7 @@ class Component extends React.Component {
       atlas:[], activeAtlas:0, atlasExport:{ spacing:1, padding:1, transparent:true }, atlasSheetOpen:false,
       tileExport:{ layout:'grid', cols:4, spacing:0, padding:0, transparent:true },
       tileSheetOpen:false, newOpen:false, saveAs:null,
+      pasteOpen:false, pasteText:'', pasteMsg:'',
       npName:'untitled', npW:32, npH:32, npTransparent:true,
       exportScope:'all',
       fg:'#c2417a', bg:'#15130f', palette:PALETTE.slice(), recent:['#c2417a','#f07fae','#6fb0c9','#a8763f'],
@@ -301,7 +302,12 @@ class Component extends React.Component {
     requestAnimationFrame(() => requestAnimationFrame(() => this.fit()));
     const box = this.mainRef.current && this.mainRef.current.closest('main');
     if (box && window.ResizeObserver){ this.ro = new ResizeObserver(() => this.fit()); this.ro.observe(box); }
+    let loadedFromLink = false;
     try {
+      const m = (location.hash || '').match(/[#&]art=([^&]+)/);
+      if (m){ const b = m[1].replace(/-/g,'+').replace(/_/g,'/'); const json = decodeURIComponent(escape(atob(b))); this.importSpec(json, { fresh:true }); loadedFromLink = true; }
+    } catch(err){}
+    if (!loadedFromLink) try {
       const raw = localStorage.getItem(AUTO_KEY);
       if (raw){
         const d = JSON.parse(raw);
@@ -324,6 +330,126 @@ class Component extends React.Component {
   }
   componentDidUpdate(){ if (this.autoFit !== false) this.fit(); this.paint(); }
 
+  _norm(c){ return (typeof c === 'string' && c) ? (c[0] === '#' ? c : '#' + c) : null; }
+  /* a fresh char-assigner that builds a palette as colours are seen */
+  paletteFor(){
+    const chars = '#@%&*+=~oO0xXABCDEFGHJKLMNPQRSTUVWYZabcdefghjkmnpqrstuvwyz123456789';
+    const map = new Map([[null, '.']]); const palette = { '.': null }; let next = 0;
+    const charFor = c => { c = c || null; if (map.has(c)) return map.get(c); const ch = chars[next++] || '?'; map.set(c, ch); palette[ch] = c; return ch; };
+    return { charFor, palette };
+  }
+  rowsToPx(rows, pal, W, H){
+    rows = (rows || []).map(r => String(r));
+    const px = new Array(W*H).fill(null);
+    for (let y=0;y<H;y++){ const r = rows[y] || ''; for (let x=0;x<W;x++){ const ch = r[x] || '.'; if (Object.prototype.hasOwnProperty.call(pal, ch) && pal[ch]) px[y*W+x] = this._norm(pal[ch]); } }
+    return px;
+  }
+  /* strip code fences / surrounding prose / trailing commas so messy LLM output still parses */
+  cleanJson(text){
+    let t = String(text).trim();
+    t = t.replace(/^```[a-zA-Z0-9]*\s*/, '').replace(/```\s*$/, '').trim();
+    if (!(t[0] === '{' || t[0] === '[')){ const i = t.indexOf('{'), j = t.lastIndexOf('}'); if (i >= 0 && j > i) t = t.slice(i, j + 1); }
+    return t.replace(/,(\s*[}\]])/g, '$1');
+  }
+  /* plain-text "legend + grid" format — no JSON, nothing to escape */
+  parsePlainGrid(text){
+    const lines = String(text).replace(/\r/g, '').split('\n');
+    const palette = { '.': null, ' ': null };
+    let W = 0, H = 0; const rows = [];
+    const colorTok = s => { s = s.trim().toLowerCase(); if (['transparent','none','null','-','.'].includes(s)) return null; if (/^#?[0-9a-f]{6}$/.test(s)) return s[0] === '#' ? s : '#' + s; if (/^#?[0-9a-f]{3}$/.test(s)){ const h = s.replace('#',''); return '#' + h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; } return undefined; };
+    for (const raw of lines){
+      const line = raw.replace(/\s+$/, '');
+      if (!line.trim() || /^\/\//.test(line.trim())) continue;
+      const sz = line.trim().match(/^(\d+)\s*[x×]\s*(\d+)$/i); if (sz){ W = +sz[1]; H = +sz[2]; continue; }
+      const m = line.match(/^(\S)[ \t]+(\S.*)$/); if (m){ const c = colorTok(m[2]); if (c !== undefined){ palette[m[1]] = c; continue; } }
+      rows.push(line);
+    }
+    if (!rows.length) return null;
+    return { w: W || rows.reduce((a, r) => Math.max(a, r.length), 0), h: H || rows.length, palette, rows };
+  }
+
+  /* serialise the current surface (or whole animation) to the LLM-friendly ASCII-grid + palette spec */
+  toSpecObject(opts){
+    opts = opts || {};
+    const s = this.state, d = this.dims();
+    if (opts.allFrames && s.workspace === 'frames' && s.frames.length > 1){
+      const { charFor, palette } = this.paletteFor();
+      const toRows = px => { const r = []; for (let y=0;y<d.h;y++){ let row=''; for (let x=0;x<d.w;x++) row += charFor(px[y*d.w+x]); r.push(row); } return r; };
+      const frames = s.frames.map(f => ({ rows: toRows(f.px), dur: f.dur || 120 }));
+      const spec = { w:d.w, h:d.h, palette, frames };
+      if (s.tags && s.tags.length) spec.tags = s.tags.map(t => ({ name:t.name, start:t.start, end:t.end, mode:t.mode }));
+      return spec;
+    }
+    const { charFor, palette } = this.paletteFor();
+    const px = this.curPx(), rows = [];
+    for (let y=0;y<d.h;y++){ let row=''; for (let x=0;x<d.w;x++) row += charFor(px[y*d.w+x]); rows.push(row); }
+    return { w:d.w, h:d.h, palette, rows };
+  }
+  /* shareable deep-link: the sprite/animation encoded in the URL hash (loads on open) */
+  toLink(spec){
+    const json = JSON.stringify(spec || this.toSpecObject({ allFrames:true }));
+    const enc = btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    return location.origin + location.pathname + '#art=' + enc;
+  }
+  /* write a full pixel buffer to the current surface (frame/tile/sprite), resizing first if needed; undo-safe */
+  writeSurface(px, w, h){
+    w = Math.max(1, Math.min(256, w|0)); h = Math.max(1, Math.min(256, h|0));
+    const norm = c => (typeof c === 'string' && c) ? (c[0] === '#' ? c : '#' + c) : null;
+    const write = () => {
+      this.snap();
+      this.setState(s => {
+        const arr = new Array(w*h); for (let i=0;i<w*h;i++) arr[i] = norm(px[i]);
+        if (s.workspace === 'atlas'){ const a = s.atlas.slice(), i = s.activeAtlas; if (!a[i]) return null; a[i] = {...a[i], w, h, px:arr}; return { atlas:a }; }
+        if (s.workspace === 'tiles'){ const t = s.tiles.slice(), i = s.activeTile; if (!t[i]) return null; t[i] = {...t[i], px:arr}; return { tiles:t }; }
+        const f = s.frames.slice(); f[s.active] = {...f[s.active], px:arr}; return { frames:f };
+      }, () => { this.forceUpdate(); this.markDirty(); });
+    };
+    const d = this.dims();
+    if (w !== d.w || h !== d.h){
+      if (this.state.workspace === 'atlas') this.setAtlasDims(this.state.activeAtlas, w, h);
+      else this.setDims(w, h);
+      setTimeout(write, 0);
+    } else write();
+  }
+  /* parse a spec (JSON ASCII-grid, multi-frame animation, legend+grid text, or a .pixelproj) and apply it.
+     opts.fresh → a single sprite becomes a clean 1-frame project (used by shareable links). */
+  importSpec(text, opts){
+    let data = (typeof text === 'object' && text) ? text : null;
+    if (!data){
+      if (!String(text || '').trim()) throw new Error('Nothing to import — paste a sprite spec, a legend + grid, or a .pixelproj.');
+      try { data = JSON.parse(this.cleanJson(text)); } catch(e){ data = this.parsePlainGrid(text); }
+    }
+    if (!data) throw new Error('Could not read — paste a JSON spec, a legend + grid, or a .pixelproj.');
+
+    // full project (.pixelproj) — frames carry px arrays
+    if (data.format === 'pixelproj' || (Array.isArray(data.frames) && data.frames[0] && Array.isArray(data.frames[0].px))){
+      this.loadProject(data, false);
+      return { kind:'project', frames:(data.frames||[]).length };
+    }
+    // animation — frames carry ASCII rows
+    if (Array.isArray(data.frames) && data.frames.length && data.frames.some(f => f && Array.isArray(f.rows))){
+      const basePal = data.palette || {};
+      const allRows = data.frames.flatMap(f => (f.rows || []).map(String));
+      const H = Math.max(1, Math.min(256, data.h || Math.max(1, ...data.frames.map(f => (f.rows||[]).length))));
+      const W = Math.max(1, Math.min(256, data.w || Math.max(1, ...allRows.map(r => r.length))));
+      const frames = data.frames.map((f, i) => ({ id:'f'+i+'_'+Date.now(), px: this.rowsToPx(f.rows, {...basePal, ...(f.palette||{})}, W, H), sel:true, dur: f.dur || data.dur || 120 }));
+      const tags = (data.tags || []).map((t, i) => ({ id:'tg'+i, name:t.name || ('Anim '+(i+1)), start:t.start || 1, end:t.end || frames.length, mode:t.mode || 'Forward', color:t.color || TAG_COLORS[i % TAG_COLORS.length] }));
+      this.loadProject({ format:'pixelproj', version:1, name:data.name || 'imported', w:W, h:H, frames, tags, activeTag:(tags[0] && tags[0].id) || null }, false);
+      return { kind:'animation', frames:frames.length, w:W, h:H };
+    }
+    // single sprite — ASCII rows
+    if (Array.isArray(data.rows)){
+      const rows = data.rows.map(r => String(r));
+      const h = Math.max(1, Math.min(256, data.h || rows.length));
+      const w = Math.max(1, Math.min(256, data.w || rows.reduce((m, r) => Math.max(m, r.length), 0)));
+      const px = this.rowsToPx(rows, data.palette || {}, w, h);
+      if (opts && opts.fresh) this.loadProject({ format:'pixelproj', version:1, name:data.name || 'imported', w, h, frames:[{ id:'f0', px, sel:true, dur:120 }], tags:[] }, false);
+      else this.writeSurface(px, w, h);
+      return { kind:'sprite', w, h, filled: px.filter(Boolean).length };
+    }
+    throw new Error('Unrecognised format. Use { w, h, palette, rows:[…] }, a frames:[…] animation, a legend + grid, or a .pixelproj.');
+  }
+
   /* ── scripting API — window.proplet — read/write pixels directly, no UI simulation.
      Works on the CURRENT surface (active frame, tile, or atlas sprite, per workspace). ── */
   installApi(){
@@ -339,15 +465,14 @@ class Component extends React.Component {
 
       setPixels: (px, w, h) => {
         if (!Array.isArray(px)) throw new Error('setPixels(px[, w, h]): px must be an array of hex strings or null');
-        if (w && h && (w !== self.dims().w || h !== self.dims().h)) self.resizeCurrent(w, h);
-        const d = self.dims();
-        if (px.length !== d.w * d.h) throw new Error('setPixels: px.length (' + px.length + ') must equal w*h (' + (d.w * d.h) + '). Pass w,h to resize first.');
-        self.snap();
-        const cur = self.curPx();
-        for (let i = 0; i < cur.length; i++) cur[i] = norm(px[i]);
-        repaint();
-        return { w:d.w, h:d.h };
+        const d = self.dims(), W = w || d.w, H = h || d.h;
+        if (px.length !== W * H) throw new Error('setPixels: px.length (' + px.length + ') must equal w*h (' + (W * H) + ').');
+        self.writeSurface(px, W, H);
+        return { w:W, h:H };
       },
+      paste: (text) => self.importSpec(text),
+      toSpec: (opts) => self.toSpecObject(opts),
+      toLink: (spec) => self.toLink(spec),
       setPixel: (x, y, color) => { const d = self.dims(); if (x < 0 || y < 0 || x >= d.w || y >= d.h) return false; self.snap(); self.curPx()[y * d.w + x] = norm(color); repaint(); return true; },
       fillRect: (x, y, w, h, color) => { const d = self.dims(); self.snap(); const cur = self.curPx(), c = norm(color); for (let yy = Math.max(0, y); yy < Math.min(d.h, y + h); yy++) for (let xx = Math.max(0, x); xx < Math.min(d.w, x + w); xx++) cur[yy * d.w + xx] = c; repaint(); return true; },
       clear: () => { self.snap(); self.curPx().fill(null); repaint(); return true; },
@@ -1030,7 +1155,7 @@ class Component extends React.Component {
       return;
     }
     if (k===' '){ e.preventDefault(); this.play(); return; }
-    if (k==='escape'){ this.commitFloatingSelection(); this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, sheetOpen:false, tileSheetOpen:false, atlasSheetOpen:false}); return; }
+    if (k==='escape'){ this.commitFloatingSelection(); this.setState({selRect:null, menu:null, tfx:null, tagEdit:null, saveAs:null, newOpen:false, pasteOpen:false, sheetOpen:false, tileSheetOpen:false, atlasSheetOpen:false}); return; }
     if ((k==='delete' || k==='backspace') && this.state.selRect){ e.preventDefault(); this.selDelete(); return; }
     if (k.startsWith('arrow')){
       const d = { arrowleft:[-1,0], arrowright:[1,0], arrowup:[0,-1], arrowdown:[0,1] }[k];
@@ -1765,6 +1890,7 @@ class Component extends React.Component {
       { label:'Save', note:'⌘S', click:close(()=>this.saveProject(false)) },
       { label:'Save As…', note:'⇧⌘S', click:close(()=>this.saveProject(true)) },
       { label:'Import Image…', note:'', click:close(()=>this.fileRef.current && this.fileRef.current.click()) },
+      { label:'Paste sprite code…', note:'', click:close(()=>this.setState({ pasteOpen:true, pasteMsg:'' })) },
       { label:'Export PNG', note:'', click:close(()=>this.exportPng()) },
       { label:'Export Sprite Sheet…', note:'', click:close(()=>this.setState({sheetOpen:true})) },
       { label:'Export Tile Set…', note:'', click:close(()=>this.setState({tileSheetOpen:true})) }
@@ -2285,6 +2411,26 @@ class Component extends React.Component {
       })),
       closeExport: () => this.setState({ sheetOpen:false, tileSheetOpen:false, atlasSheetOpen:false }),
       openExport: () => { const w=this.state.workspace; const tab = w==='tiles'?'tiles':w==='atlas'?'atlas':'sheet'; this.setState({ sheetOpen:tab==='sheet', tileSheetOpen:tab==='tiles', atlasSheetOpen:tab==='atlas' }); },
+
+      pasteOpen: s.pasteOpen,
+      pasteText: s.pasteText,
+      pasteMsg: s.pasteMsg,
+      openPaste: () => this.setState({ pasteOpen:true, pasteMsg:'' }),
+      closePaste: () => this.setState({ pasteOpen:false }),
+      setPasteText: e => this.setState({ pasteText:e.target.value }),
+      applyPaste: () => { try { const r = this.importSpec(this.state.pasteText); this.setState({ pasteOpen:false, hint: r.kind==='project' ? ('Imported project · '+r.frames+' frames') : ('Imported '+r.w+'×'+r.h+' · '+r.filled+' px') }); } catch(err){ this.setState({ pasteMsg:'⚠ '+err.message }); } },
+      copyCurrentCode: () => {
+        const txt = JSON.stringify(this.toSpecObject({ allFrames:true }), null, 2);
+        let copied = false;
+        try { if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>{}, ()=>{}); copied = true; } } catch(e){}
+        this.setState({ pasteText:txt, pasteMsg: copied ? 'Loaded the current sprite as code — also copied to clipboard.' : 'Loaded the current sprite as code — select & copy from the box.' });
+      },
+      copyLink: () => {
+        const url = this.toLink();
+        let copied = false;
+        try { if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(()=>{}, ()=>{}); copied = true; } } catch(e){}
+        this.setState({ pasteText:url, pasteMsg: (copied ? 'Share-link copied to clipboard' : 'Share-link below') + ' — opens this sprite when visited (' + url.length + ' chars).' });
+      },
       layouts: [['horizontal','Horizontal'],['vertical','Vertical'],['grid','Grid']].map(([id,label]) => ({
         label, on:s.layout===id, pick:()=>this.setState({layout:id})
       })),
@@ -3258,6 +3404,28 @@ class Component extends React.Component {
               <div style={css("display:flex;justify-content:flex-end;gap:7px;margin-top:16px")}>
                 <Hov onClick={R.closeSaveAs} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
                 <button onClick={R.confirmSaveAs} className="btn btn-primary">Save project</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {R.pasteOpen && (
+          <div onClick={R.closePaste} style={css("position:fixed;inset:0;background:rgba(10,9,7,.66);display:flex;align-items:center;justify-content:center;z-index:75")}>
+            <div onClick={R.stop} style={css("width:560px;max-width:94vw;background:var(--bg1);border:1px solid var(--line);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:18px")}>
+              <div style={css("font-family:'Cormorant Garamond',serif;font-size:21px;line-height:1.1")}>Paste sprite code</div>
+              <div style={css("font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:3px")}>ASCII grid + palette, or a .pixelproj</div>
+              <div style={css("margin-top:12px;font-size:11px;color:var(--dim);line-height:1.5")}>Paste a JSON spec <span style={css("color:var(--fg);font-family:monospace")}>{'{ "w":16,"h":16,"palette":{".":null,"R":"#e23b4e"},"rows":[…] }'}</span>, a plain legend + grid, a <span style={css("color:var(--fg)")}>frames:[…]</span> animation, or a .pixelproj. One char per pixel, <span style={css("font-family:monospace;color:var(--fg)")}>.</span> is transparent. Code fences &amp; stray prose are tolerated.</div>
+              <textarea value={R.pasteText} onChange={R.setPasteText} spellCheck={false} placeholder={'{ "w":16, "h":16, "palette":{ ".":null, "R":"#e23b4e" }, "rows":[ … ] }'} style={css("width:100%;height:220px;margin-top:12px;background:var(--bg0);border:1px solid var(--line);border-radius:4px;padding:10px;color:var(--fg);font-family:monospace;font-size:11.5px;line-height:1.45;outline:none;resize:vertical;white-space:pre")}></textarea>
+              <div style={css("min-height:16px;margin-top:8px;font-size:10.5px;color:var(--gold);font-style:italic")}>{R.pasteMsg}</div>
+              <div style={css("display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px")}>
+                <div style={css("display:flex;gap:7px")}>
+                  <Hov onClick={R.copyCurrentCode} title="Dump the current sprite/animation into the box (and clipboard) so you can round-trip it" s="padding:8px 12px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11.5px;cursor:pointer" sh="color:var(--fg);border-color:rgba(236,231,222,.3)">Copy as code</Hov>
+                  <Hov onClick={R.copyLink} title="Put a shareable link in the box (and clipboard) that opens this sprite when visited" s="padding:8px 12px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11.5px;cursor:pointer" sh="color:var(--fg);border-color:rgba(236,231,222,.3)">Copy link</Hov>
+                </div>
+                <div style={css("display:flex;gap:7px")}>
+                  <Hov onClick={R.closePaste} s="padding:8px 13px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:12px;cursor:pointer" sh="color:var(--fg)">Cancel</Hov>
+                  <button onClick={R.applyPaste} className="btn btn-primary">Apply</button>
+                </div>
               </div>
             </div>
           </div>
