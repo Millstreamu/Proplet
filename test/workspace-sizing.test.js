@@ -1,0 +1,117 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const babel = require('@babel/core');
+const html = fs.readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+const source = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[1].split('const root = ReactDOM.createRoot')[0];
+const compiled = babel.transformSync(source + '\nglobalThis.Editor = Component;', {presets:['@babel/preset-react'], babelrc:false, configFile:false}).code;
+function editor() {
+  class State {
+    setState(update, done) { Object.assign(this.state, typeof update === 'function' ? update(this.state) : update); if (done) done(); }
+  }
+  const ctx = {clearTimeout, React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js')};
+  vm.runInNewContext(compiled, ctx);
+  const app = new ctx.Editor({});
+  app.fit = () => {};
+  app.markDirty = () => {};
+  return app;
+}
+test('animation and tile resizing preserve the other workspace and undo restores dimensions', () => {
+  const app = editor();
+  const tiles = JSON.stringify(app.state.tiles);
+  app.resizeCurrent(48,16);
+  assert.equal(JSON.stringify(app.state.tiles), tiles);
+  assert.equal(app.state.tileW,32);
+  const frames = JSON.stringify(app.state.frames);
+  app.state.workspace = 'tiles';
+  app.resizeCurrent(16,24);
+  assert.equal(JSON.stringify(app.state.frames), frames);
+  assert.equal(app.state.w,48);
+  assert.equal(app.state.h,16);
+  assert.equal(app.dims().w,16);
+  assert.equal(app.dims().h,24);
+  assert.ok(app.state.tiles.every(t=>t.px.length===384));
+  app.undo();
+  assert.equal(app.state.tileW,32);
+  assert.equal(app.state.tileH,32);
+  assert.equal(JSON.stringify(app.state.tiles),tiles);
+});
+test('independent dimensions round-trip and old projects use animation dimensions for tiles', () => {
+  const app = editor();
+  app.resizeCurrent(48,16);
+  app.state.workspace='tiles';
+  app.resizeCurrent(16,24);
+  const saved=app.serialize();
+  app.loadProject(saved,true);
+  assert.equal(app.state.w,48);
+  assert.equal(app.state.tileW,16);
+  assert.equal(app.state.tileH,24);
+  assert.equal(app.tileMeta().tileWidth,16);
+  app.addTile();
+  assert.equal(app.curPx().length,384);
+  app.clearCurrent();
+  assert.equal(app.curPx().length,384);
+  delete saved.tileSettings.w;
+  delete saved.tileSettings.h;
+  app.loadProject(saved,true);
+  assert.equal(app.state.tileW,48);
+  assert.equal(app.state.tileH,16);
+});
+
+test('named animation sheets preserve independent frames, sizes, timing and tags', () => {
+  const app = editor();
+  app.renameAnimation('Potion swirl');
+  const first=app.state.activeAnimation;
+  const original=JSON.stringify(app.state.frames);
+  app.addAnimation('Potion pour');
+  const second=app.state.activeAnimation;
+  assert.notEqual(first,second);
+  assert.equal(app.state.frames.length,1);
+  assert.ok(app.curPx().every(p=>p===null));
+  app.resizeCurrent(16,24);
+  app.curPx()[0]='#abcdef';
+  app.state.frames[0].dur=240;
+  app.state.tags=[{id:'pour', name:'Pour', start:1, end:1, mode:'Forward'}];
+  app.state.activeTag='pour';
+  app.selectAnimation(first);
+  assert.equal(app.state.w,32);
+  assert.equal(JSON.stringify(app.state.frames),original);
+  assert.equal(app.state.activeTag,'t2');
+  app.selectAnimation(second);
+  assert.equal(app.state.w,16);
+  assert.equal(app.state.h,24);
+  assert.equal(app.curPx()[0],'#abcdef');
+  assert.equal(app.state.frames[0].dur,240);
+  assert.equal(app.state.activeTag,'pour');
+  assert.equal(app.state.playing,false);
+});
+test('all sheets and single-sheet projects round-trip without losing inactive animations', () => {
+  const app=editor();
+  const first=app.state.activeAnimation;
+  app.addAnimation('Potion pour');
+  app.curPx()[0]='#abcdef';
+  const second=app.state.activeAnimation;
+  const together=JSON.parse(JSON.stringify(app.serialize()));
+  app.loadProject(together,true);
+  assert.equal(app.state.animations.length,2);
+  assert.equal(app.state.activeAnimation,second);
+  assert.equal(app.curPx()[0],'#abcdef');
+  app.selectAnimation(first);
+  assert.equal(app.state.frames.length,12);
+  app.selectAnimation(second);
+  const separate=JSON.parse(JSON.stringify(app.singleAnimationProject()));
+  assert.equal(separate.name,'Potion pour');
+  assert.equal(separate.animations.length,1);
+  app.loadProject(separate,true);
+  assert.equal(app.state.animations.length,1);
+  assert.equal(app.curPx()[0],'#abcdef');
+  const legacy={name:'Old sprite',w:16,h:16,frames:[{id:'old',px:new Array(256).fill(null),dur:80}],tags:[]};
+  app.loadProject(legacy,true);
+  assert.equal(app.state.animations.length,1);
+  assert.equal(app.state.frames[0].dur,80);
+  app.addAnimation('New');
+  app.selectAnimation('animation-1');
+  assert.equal(app.state.frames[0].dur,80);
+});

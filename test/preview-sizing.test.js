@@ -28,7 +28,7 @@ test('rejects invalid dimensions', () => {
 
 test('the app uses the bounded preview renderer and a fixed selector container', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.match(html, /drawPreview\(el, t\.px, s\.w, s\.h, 66\)/);
+  assert.match(html, /drawPreview\(el, t\.px, s\.tileW, s\.tileH, 66\)/);
   assert.match(html, /drawPreview\(el, it\.px, it\.w, it\.h, 66\)/);
   assert.match(html, /drawPreview\(el, f\.px, s\.w, s\.h, 66\)/);
   assert.match(html, /data-preview-box="66"[^>]+width:66px;height:66px;overflow:hidden/);
