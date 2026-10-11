@@ -199,6 +199,7 @@ class Component extends React.Component {
     const w = 32, h = 32;
     this.state = {
       w, h, frames:this.demoFrames(w,h), active:0, tool:'pencil',
+      animations:[{id:'animation-1', name:'Potion swirl'}], activeAnimation:'animation-1',
       projectName:'player_walk', named:false, dirty:false, savedAt:null,
       autoState:'idle', autoAt:null, restore:null, pending:null,
       workspace:'frames',
@@ -208,7 +209,7 @@ class Component extends React.Component {
         { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
       ],
       activeTag:'t2', tagEdit:null,
-      tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
+      tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
       atlas:[], activeAtlas:0, atlasExport:{ spacing:1, padding:1, transparent:true }, atlasSheetOpen:false,
@@ -219,7 +220,7 @@ class Component extends React.Component {
       exportScope:'all',
       fg:'#c2417a', bg:'#15130f', palette:PALETTE.slice(), recent:['#c2417a','#f07fae','#6fb0c9','#a8763f'],
       ramps:RAMPS.map(r=>({...r, colors:r.colors.slice()})),
-      shadeMode: p.shadeModeDefault === 'Basic RGB' ? 'rgb' : 'ramp', paintMode:'solid',
+      shadeMode: p.shadeModeDefault === 'Basic RGB' ? 'rgb' : 'ramp', paintMode:'solid', paintStrengths:PixelStudioPaint.paintStrengths(),
       cell:15, grid:p.showGridDefault !== false, tile:!!p.tileDefault, viewBackground:'checker',
       mirrorH:false, mirrorV:false, shapeFill:false,
       onion:{ on:!!p.onionDefault, prev:1, next:1, opacity:p.onionOpacityDefault || 35 },
@@ -690,7 +691,7 @@ class Component extends React.Component {
     this.paintMain();
     if (s.workspace === 'tiles'){
       this.paintTileRepeat();
-      s.tiles.forEach(t => { const el = this.thumbs[t.id]; if (el) this.drawPreview(el, t.px, s.w, s.h, 66); });
+      s.tiles.forEach(t => { const el = this.thumbs[t.id]; if (el) this.drawPreview(el, t.px, s.tileW, s.tileH, 66); });
     } else if (s.workspace === 'atlas'){
       const a = s.atlas[s.activeAtlas];
       if (a) this.drawPreview(this.previewRef.current, a.px, a.w, a.h, 88);
@@ -758,7 +759,7 @@ class Component extends React.Component {
     this.redoStack = [];
     this.markDirty();
   }
-  cap(){ return { frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, selRect:this.state.selRect }; }
+  cap(){ return { frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, tileW:this.state.tileW, tileH:this.state.tileH, selRect:this.state.selRect }; }
   undo(){ if (!this.undoStack.length) return; this.commitFloatingSelection(); this.redoStack.push(this.cap()); this.setState(this.undoStack.pop()); }
   redo(){ if (!this.redoStack.length) return; this.commitFloatingSelection(); this.undoStack.push(this.cap()); this.setState(this.redoStack.pop()); }
 
@@ -826,6 +827,7 @@ class Component extends React.Component {
   dims(){
     const s = this.state;
     if (s.workspace === 'atlas'){ const a = s.atlas[s.activeAtlas]; if (a) return { w:a.w, h:a.h }; }
+    if (s.workspace === 'tiles') return { w:s.tileW, h:s.tileH };
     return { w:s.w, h:s.h };
   }
   touch(){ this.forceUpdate(); this.markDirty(); }
@@ -846,12 +848,12 @@ class Component extends React.Component {
     if (tool==='pencil'){
       if (this.stroked.has(i)) return;
       this.stroked.add(i);
-      px[i] = PixelStudioPaint.applyPaintMode(px[i], fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix);
+      px[i] = PixelStudioPaint.applyPaintMode(px[i], fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix, this.state.paintStrengths[paintMode]);
     }
     else if (tool==='eraser') px[i] = null;
     else if (tool==='picker'){ if (px[i]) this.pickColor(px[i]); }
     else if (tool==='fill') PixelStudioPaint.floodPaint(px, W, d.h, x, y,
-      current => PixelStudioPaint.applyPaintMode(current, fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix));
+      current => PixelStudioPaint.applyPaintMode(current, fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix, this.state.paintStrengths[paintMode]));
   }
   apply(x,y){
     const { tool } = this.state;
@@ -994,7 +996,7 @@ class Component extends React.Component {
     if (base) for (let i=0;i<px.length;i++) px[i] = base[i];
     const d = this.dims(), W = d.w, H = d.h, fg = this.state.fg, paintMode = this.state.paintMode;
     const plotted = new Set();
-    const plot = (x,y) => { this.mirrorPts(x,y).forEach(([mx,my]) => { const i=my*W+mx; if (mx>=0 && mx<W && my>=0 && my<H && !plotted.has(i)){ plotted.add(i); px[i] = PixelStudioPaint.applyPaintMode(px[i], fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix); } }); };
+    const plot = (x,y) => { this.mirrorPts(x,y).forEach(([mx,my]) => { const i=my*W+mx; if (mx>=0 && mx<W && my>=0 && my<H && !plotted.has(i)){ plotted.add(i); px[i] = PixelStudioPaint.applyPaintMode(px[i], fg, paintMode, (c,dir)=>this.rampStep(c,dir), mix, this.state.paintStrengths[paintMode]); } }); };
     let x0=a.x, y0=a.y, x1=b.x, y1=b.y;
     if (this.state.tool === 'line'){
       const end = e && e.shiftKey ? PixelStudioLine.snapEndpoint(a, b) : b;
@@ -1220,23 +1222,26 @@ class Component extends React.Component {
   setDims(nw, nh){
     nw = Math.max(1, Math.min(256, Math.round(nw) || 0));
     nh = Math.max(1, Math.min(256, Math.round(nh) || 0));
-    if (!nw || !nh || (nw === this.state.w && nh === this.state.h)) return;
+    const tiles = this.state.workspace === 'tiles';
+    const old = tiles ? {w:this.state.tileW, h:this.state.tileH} : {w:this.state.w, h:this.state.h};
+    if (!nw || !nh || (nw === old.w && nh === old.h)) return;
     this.snap();
     this.setState(s => {
       const remap = px => {
         const out = new Array(nw*nh).fill(null);
-        const ox = Math.floor((nw - s.w)/2), oy = Math.floor((nh - s.h)/2);
-        for (let y=0;y<s.h;y++) for (let x=0;x<s.w;x++){
+        const ox = Math.floor((nw - old.w)/2), oy = Math.floor((nh - old.h)/2);
+        for (let y=0;y<old.h;y++) for (let x=0;x<old.w;x++){
           const dx = x+ox, dy = y+oy;
-          if (dx>=0 && dx<nw && dy>=0 && dy<nh) out[dy*nw+dx] = px[y*s.w+x];
+          if (dx>=0 && dx<nw && dy>=0 && dy<nh) out[dy*nw+dx] = px[y*old.w+x];
         }
         return out;
       };
       return {
-        w:nw, h:nh, selRect:null,
-        frames: s.frames.map(f => ({...f, px:remap(f.px)})),
-        tiles: s.tiles.map(t => ({...t, px:remap(t.px)})),
-        hint:'Canvas ' + nw + ' × ' + nh
+        ...(tiles
+          ? {tileW:nw, tileH:nh, tiles:s.tiles.map(t => ({...t, px:remap(t.px)}))}
+          : {w:nw, h:nh, frames:s.frames.map(f => ({...f, px:remap(f.px)}))}),
+        selRect:null,
+        hint:(tiles ? 'Tile canvas ' : 'Animation canvas ') + nw + ' × ' + nh
       };
     }, () => this.fit());
   }
@@ -1377,16 +1382,71 @@ class Component extends React.Component {
     return px;
   }
 
+  /* Each animation keeps its frames, dimensions, tags and export settings. */
+  animationSnapshot(){
+    const s = this.state;
+    return {w:s.w, h:s.h, frames:s.frames, active:s.active, tags:s.tags, activeTag:s.activeTag,
+      sheet:{layout:s.layout, cols:s.cols, spacing:s.spacing, padding:s.padding, transparent:s.transparent, scope:s.exportScope}};
+  }
+  animationSheets(){
+    return this.state.animations.map(a => a.id === this.state.activeAnimation ? {...a, ...this.animationSnapshot()} : a);
+  }
+  selectAnimation(id){
+    if (id === this.state.activeAnimation) return;
+    const animations = this.animationSheets(), a = animations.find(a => a.id === id);
+    if (!a) return;
+    this.commitFloatingSelection();
+    clearTimeout(this.timer);
+    this.undoStack = []; this.redoStack = [];
+    const sh = a.sheet || {};
+    this.setState({animations, activeAnimation:id, w:a.w, h:a.h, frames:a.frames, active:a.active || 0,
+      tags:a.tags || [], activeTag:a.activeTag || null, playing:false, previewIdx:0, selRect:null, clip:null,
+      tagEdit:null, tfx:null, menu:null, workspace:'frames', tile:false, wrap:false,
+      layout:sh.layout || 'grid', cols:sh.cols || 4, spacing:sh.spacing ?? 2, padding:sh.padding ?? 4,
+      transparent:sh.transparent !== false, exportScope:sh.scope || 'all', hint:'Animation: ' + a.name},
+      () => {this.fit(); this.markDirty();});
+  }
+  addAnimation(name){
+    const n = name == null ? window.prompt('New animation sheet name', 'Animation ' + (this.state.animations.length+1)) : name;
+    if (!n || !n.trim()) return;
+    const id = 'animation-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
+    const a = {id, name:n.trim(), w:this.state.w, h:this.state.h,
+      frames:[{id:id+'-f0', px:new Array(this.state.w*this.state.h).fill(null), sel:true, dur:120}],
+      tags:[], activeTag:null, active:0, sheet:this.animationSnapshot().sheet};
+    this.setState({animations:this.animationSheets().concat(a)}, () => this.selectAnimation(id));
+  }
+  renameAnimation(name){
+    const current = this.state.animations.find(a => a.id === this.state.activeAnimation);
+    const n = name == null ? window.prompt('Animation sheet name', current.name) : name;
+    if (!n || !n.trim()) return;
+    this.setState(s => ({animations:s.animations.map(a => a.id===s.activeAnimation ? {...a, name:n.trim()} : a)}), () => this.markDirty());
+  }
+  singleAnimationProject(){
+    const project = this.serialize();
+    const a = project.animations.find(a => a.id === project.activeAnimation);
+    return {...project, name:a.name, animations:[a], workspace:'frames', tiles:[], atlas:[], terrains:[]};
+  }
+  saveAnimation(){
+    const project = this.singleAnimationProject();
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(project)], {type:'application/json'}));
+    a.href=url; a.download=project.name.replace(/[\\/:*?"<>|]/g,'_')+'.pixelproj';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    this.setState({hint:'Saved animation sheet: '+project.name});
+  }
+
   /* ── project format ── */
   serialize(){
     const s = this.state;
     return {
       format:'pixelproj', version:1, name:s.projectName, w:s.w, h:s.h,
+      animations:this.animationSheets(), activeAnimation:s.activeAnimation,
       frames:s.frames.map(f=>({ id:f.id, px:f.px, sel:f.sel, dur:f.dur })),
       tags:s.tags, activeTag:s.activeTag,
-      palette:s.palette, ramps:s.ramps, recent:s.recent, shadeMode:s.shadeMode, paintMode:s.paintMode,
+      palette:s.palette, ramps:s.ramps, recent:s.recent, shadeMode:s.shadeMode, paintMode:s.paintMode, paintStrengths:s.paintStrengths,
       mirror:{ h:s.mirrorH, v:s.mirrorV },
-      tileSettings:{ on:s.tile, wrap:s.wrap, preview:s.tilePreview },
+      tileSettings:{ w:s.tileW, h:s.tileH, on:s.tile, wrap:s.wrap, preview:s.tilePreview },
       onion:s.onion,
       sheet:{ layout:s.layout, cols:s.cols, spacing:s.spacing, padding:s.padding, transparent:s.transparent, scope:s.exportScope },
       tiles:s.tiles.map(t=>({ id:t.id, name:t.name, px:t.px, kind:t.kind, corners:t.corners, collision:t.collision, tags:t.tags })),
@@ -1396,27 +1456,34 @@ class Component extends React.Component {
     };
   }
   loadProject(d, named){
+    const project = d;
+    const animations = Array.isArray(d.animations) && d.animations.length ? d.animations :
+      [{id:'animation-1', name:d.name || 'Animation 1', w:d.w || d.size || 32, h:d.h || d.size || 32,
+        frames:d.frames, tags:d.tags || [], activeTag:d.activeTag || null, sheet:d.sheet}];
+    const animation = animations.find(a => a.id === d.activeAnimation) || animations[0];
+    d = {...d, ...animation, name:project.name};
     const w = d.w != null ? d.w : (d.size || 32);
     const h = d.h != null ? d.h : (d.size || 32);
     const ts = d.tileSettings || {};
     const sh = d.sheet || {};
     this.undoStack = []; this.redoStack = [];
     this.setState({
+      animations, activeAnimation:animation.id,
       projectName: d.name || 'untitled', named:!!named, dirty:false, savedAt: named ? Date.now() : null,
-      w, h,
+      w, h, tileW:ts.w || w, tileH:ts.h || h,
       frames: (d.frames && d.frames.length) ? d.frames.map((f,i)=>({ id:f.id||'f'+i, px:f.px||new Array(w*h).fill(null), sel:f.sel!==false, dur:f.dur||120 })) : this.demoFrames(w,h),
       active:0,
       tags: d.tags || [], activeTag: d.activeTag || null,
       palette: d.palette || PALETTE.slice(),
       ramps: d.ramps || RAMPS.map(r=>({...r, colors:r.colors.slice()})),
-      recent: d.recent || [], shadeMode: d.shadeMode || 'ramp', paintMode:d.paintMode || 'solid',
+      recent: d.recent || [], shadeMode: d.shadeMode || 'ramp', paintMode:d.paintMode || 'solid', paintStrengths:PixelStudioPaint.paintStrengths(d.paintStrengths),
       mirrorH: !!(d.mirror && d.mirror.h), mirrorV: !!(d.mirror && d.mirror.v),
       tile: !!ts.on, wrap: !!ts.wrap, tilePreview: ts.preview || 3,
       onion: d.onion || { on:false, prev:1, next:1, opacity:35 },
       layout: sh.layout || 'grid', cols: sh.cols || 4,
       spacing: sh.spacing == null ? 2 : sh.spacing, padding: sh.padding == null ? 4 : sh.padding,
       transparent: sh.transparent !== false, exportScope: sh.scope || 'all',
-      tiles: (d.tiles && d.tiles.length) ? d.tiles : this.demoTiles(w,h),
+      tiles: (d.tiles && d.tiles.length) ? d.tiles : this.demoTiles(ts.w || w,ts.h || h),
       terrains: d.terrains || [], terrainDraft:'',
       atlas: d.atlas || [],
       activeAtlas: d.activeAtlas || 0,
@@ -1463,8 +1530,9 @@ class Component extends React.Component {
     const nh = Math.max(1, Math.min(256, parseInt(s.npH,10) || 32));
     this.undoStack = []; this.redoStack = [];
     this.setState({
+      animations:[{id:'animation-1', name:'Animation 1'}], activeAnimation:'animation-1',
       projectName:(s.npName||'untitled').trim() || 'untitled', named:false, dirty:true, savedAt:null,
-      w:nw, h:nh, frames:[{ id:'f'+Date.now(), px:new Array(nw*nh).fill(null), sel:true, dur:120 }], active:0,
+      w:nw, h:nh, tileW:nw, tileH:nh, frames:[{ id:'f'+Date.now(), px:new Array(nw*nh).fill(null), sel:true, dur:120 }], active:0,
       tags:[], activeTag:null, tiles:[{ id:'tl'+Date.now(), name:'Tile 1', px:new Array(nw*nh).fill(s.npTransparent ? null : s.bg) }],
       atlas:[], activeAtlas:0, atlasSheetOpen:false,
       activeTile:0, workspace:'frames', selRect:null, clip:null, playing:false, newOpen:false,
@@ -1534,7 +1602,7 @@ class Component extends React.Component {
   addTile(){
     this.setState(s => {
       const tiles = s.tiles.slice();
-      tiles.splice(s.activeTile+1, 0, { id:'tl'+Date.now(), name:'Tile ' + (tiles.length+1), px:new Array(s.w*s.h).fill(null) });
+      tiles.splice(s.activeTile+1, 0, { id:'tl'+Date.now(), name:'Tile ' + (tiles.length+1), px:new Array(s.tileW*s.tileH).fill(null) });
       return { tiles, activeTile:s.activeTile+1, workspace:'tiles', hint:'New tile' };
     }, () => this.markDirty());
   }
@@ -1574,7 +1642,7 @@ class Component extends React.Component {
     const s = this.state, t = s.tileExport, n = Math.max(1, s.tiles.length);
     const c = t.layout==='horizontal' ? n : t.layout==='vertical' ? 1 : Math.max(1, Math.min(t.cols, n));
     const r = Math.ceil(n/c);
-    return { c, r, w:t.padding*2 + c*s.w + (c-1)*t.spacing, h:t.padding*2 + r*s.h + (r-1)*t.spacing };
+    return { c, r, w:t.padding*2 + c*s.tileW + (c-1)*t.spacing, h:t.padding*2 + r*s.tileH + (r-1)*t.spacing };
   }
   paintTileSheet(){
     const cv = this.tileSheetRef.current;
@@ -1588,14 +1656,14 @@ class Component extends React.Component {
     c.clearRect(0,0,cv.width,cv.height);
     if (!t.transparent){ c.fillStyle = '#15130f'; c.fillRect(0,0,cv.width,cv.height); }
     s.tiles.forEach((tl,i) => {
-      const ox = (t.padding + (i%g.c)*(s.w+t.spacing))*scale, oy = (t.padding + Math.floor(i/g.c)*(s.h+t.spacing))*scale;
-      this.blit(c, tl.px, s.w, s.h, scale, ox, oy, null, null);
+      const ox = (t.padding + (i%g.c)*(s.tileW+t.spacing))*scale, oy = (t.padding + Math.floor(i/g.c)*(s.tileH+t.spacing))*scale;
+      this.blit(c, tl.px, s.tileW, s.tileH, scale, ox, oy, null, null);
       c.strokeStyle = i===s.activeTile ? 'rgba(225,173,102,.8)' : 'rgba(236,231,222,.16)';
       c.lineWidth = 1;
-      c.strokeRect(ox+.5, oy+.5, s.w*scale-1, s.h*scale-1);
+      c.strokeRect(ox+.5, oy+.5, s.tileW*scale-1, s.tileH*scale-1);
     });
     if (this.tileDragFrom != null){
-      const rectOf = idx => ({ ox:(t.padding + (idx%g.c)*(s.w+t.spacing))*scale, oy:(t.padding + Math.floor(idx/g.c)*(s.h+t.spacing))*scale, w:s.w*scale, h:s.h*scale });
+      const rectOf = idx => ({ ox:(t.padding + (idx%g.c)*(s.tileW+t.spacing))*scale, oy:(t.padding + Math.floor(idx/g.c)*(s.tileH+t.spacing))*scale, w:s.tileW*scale, h:s.tileH*scale });
       const a = rectOf(this.tileDragFrom);
       c.fillStyle = 'rgba(21,19,15,.55)'; c.fillRect(a.ox, a.oy, a.w, a.h);
       if (this.tileDragOver != null){
@@ -1613,8 +1681,8 @@ class Component extends React.Component {
     const s = this.state, t = s.tileExport, g = this.tileGeom();
     const lx = (e.clientX - r.left) * (g.w / r.width), ly = (e.clientY - r.top) * (g.h / r.height);
     for (let i=0;i<s.tiles.length;i++){
-      const ox = t.padding + (i%g.c)*(s.w+t.spacing), oy = t.padding + Math.floor(i/g.c)*(s.h+t.spacing);
-      if (lx>=ox && lx<ox+s.w && ly>=oy && ly<oy+s.h) return i;
+      const ox = t.padding + (i%g.c)*(s.tileW+t.spacing), oy = t.padding + Math.floor(i/g.c)*(s.tileH+t.spacing);
+      if (lx>=ox && lx<ox+s.tileW && ly>=oy && ly<oy+s.tileH) return i;
     }
     return null;
   }
@@ -1675,8 +1743,8 @@ class Component extends React.Component {
     const c = cv.getContext('2d');
     if (!t.transparent){ c.fillStyle = '#15130f'; c.fillRect(0,0,g.w,g.h); }
     s.tiles.forEach((tl,i) => {
-      const ox = t.padding + (i%g.c)*(s.w+t.spacing), oy = t.padding + Math.floor(i/g.c)*(s.h+t.spacing);
-      this.blit(c, tl.px, s.w, s.h, 1, ox, oy, null, null);
+      const ox = t.padding + (i%g.c)*(s.tileW+t.spacing), oy = t.padding + Math.floor(i/g.c)*(s.tileH+t.spacing);
+      this.blit(c, tl.px, s.tileW, s.tileH, 1, ox, oy, null, null);
     });
     this.dl(cv, (this.state.projectName || 'tileset') + '-tileset.png');
     this.setState({ hint:'Exported tile set ' + g.w + '×' + g.h });
@@ -1695,7 +1763,7 @@ class Component extends React.Component {
     });
     return {
       image:(s.projectName||'tileset') + '-tileset.png',
-      tileWidth:s.w, tileHeight:s.h, count:s.tiles.length,
+      tileWidth:s.tileW, tileHeight:s.tileH, count:s.tiles.length,
       columns:g.c, spacing:t.spacing, padding:t.padding,
       terrains: s.terrains.slice(),
       tiles
@@ -1712,7 +1780,7 @@ class Component extends React.Component {
   paintTileRepeat(){
     const cv = this.previewRef.current;
     if (!cv) return;
-    const s = this.state, W = s.w, H = s.h, r = s.tilePreview;
+    const s = this.state, W = s.tileW, H = s.tileH, r = s.tilePreview;
     cv.width = W*r; cv.height = H*r;
     const box = 92, dispScale = box / Math.max(W*r, H*r);
     cv.style.width = (W*r*dispScale)+'px'; cv.style.height = (H*r*dispScale)+'px';
@@ -1733,7 +1801,7 @@ class Component extends React.Component {
     this.snap();
     const ws = this.state.workspace;
     if (ws === 'atlas'){ this.setState(v => { const atlas=v.atlas.slice(); const it=atlas[v.activeAtlas]; if(!it) return null; atlas[v.activeAtlas]={...it, px:new Array(it.w*it.h).fill(null)}; return { atlas, hint:'Cleared '+it.name }; }); return; }
-    if (ws === 'tiles'){ this.setState(v => { const tiles=v.tiles.slice(); const t=tiles[v.activeTile]; if(!t) return null; tiles[v.activeTile]={...t, px:new Array(v.w*v.h).fill(null)}; return { tiles, hint:'Cleared '+t.name }; }); return; }
+    if (ws === 'tiles'){ this.setState(v => { const tiles=v.tiles.slice(); const t=tiles[v.activeTile]; if(!t) return null; tiles[v.activeTile]={...t, px:new Array(v.tileW*v.tileH).fill(null)}; return { tiles, hint:'Cleared '+t.name }; }); return; }
     this.setState(v => { const frames=v.frames.slice(); frames[v.active]={...frames[v.active], px:new Array(v.w*v.h).fill(null)}; return { frames, hint:'Cleared frame '+(v.active+1) }; });
   }
   setAtlasDims(i, nw, nh){
@@ -2066,6 +2134,12 @@ class Component extends React.Component {
         label, tip, on:s.workspace===id,
         pick:()=>this.setState({ workspace:id, playing:false, selRect:null, tile:id==='tiles' ? true : (id==='atlas' ? false : s.tile), wrap:id==='atlas' ? false : s.wrap, hint:id==='atlas' ? 'Atlas — each sprite keeps its own size' : (id==='tiles' ? 'Tile set — the centre tile is editable' : 'Animation frames') }, ()=>this.fit())
       })),
+      animationSheets: s.animations,
+      activeAnimation: s.activeAnimation,
+      selectAnimation: e => this.selectAnimation(e.target.value),
+      addAnimation: () => this.addAnimation(),
+      renameAnimation: () => this.renameAnimation(),
+      saveAnimation: () => this.saveAnimation(),
       isFrames: s.workspace === 'frames',
       isTiles: s.workspace === 'tiles',
       isAtlas: s.workspace === 'atlas',
@@ -2185,7 +2259,7 @@ class Component extends React.Component {
       terrainKey: e => { if (e.key==='Enter'){ e.preventDefault(); this.addTerrain(this.state.terrainDraft); } },
 
       statusBits: (s.workspace === 'tiles'
-        ? [ s.w + ' × ' + s.h + ' px', 'Zoom ' + (s.cell*100) + '%', 'Tile: ' + (t ? t.name : '—'), 'Tile ' + (s.activeTile+1) + ' / ' + s.tiles.length, 'Tile Mode: ' + (s.tile?'On':'Off'), 'Wrap: ' + (s.wrap?'On':'Off') ]
+        ? [ s.tileW + ' × ' + s.tileH + ' px', 'Zoom ' + (s.cell*100) + '%', 'Tile: ' + (t ? t.name : '—'), 'Tile ' + (s.activeTile+1) + ' / ' + s.tiles.length, 'Tile Mode: ' + (s.tile?'On':'Off'), 'Wrap: ' + (s.wrap?'On':'Off') ]
         : s.workspace === 'atlas'
         ? [ (ai ? ai.w + ' × ' + ai.h : '—') + ' px', 'Zoom ' + (s.cell*100) + '%', 'Sprite: ' + (ai ? ai.name : '—'), 'Sprite ' + (s.activeAtlas+1) + ' / ' + s.atlas.length, 'Atlas · sizes vary', 'Mirror: ' + (s.mirrorH&&s.mirrorV?'Both':s.mirrorH?'H':s.mirrorV?'V':'Off') ]
         : [ s.w + ' × ' + s.h + ' px', 'Zoom ' + (s.cell*100) + '%', 'Frame ' + (s.active+1) + ' / ' + s.frames.length, 'Animation: ' + (this.activeTagObj() ? this.activeTagObj().name : 'All frames'), 'Mirror: ' + (s.mirrorH&&s.mirrorV?'Both':s.mirrorH?'H':s.mirrorV?'V':'Off'), 'Onion: ' + (s.onion.on ? (s.onion.prev+'←→'+s.onion.next) : 'Off') ]
@@ -2227,6 +2301,11 @@ class Component extends React.Component {
       toggleShapeFill: () => this.setState(v => ({ shapeFill:!v.shapeFill, hint:(v.shapeFill?'Shapes: outline':'Shapes: filled') })),
       hasPaintMode: ['pencil','line','rect','ellipse','fill'].includes(s.tool),
       paintMode: s.paintMode,
+      paintStrength: s.paintStrengths[s.paintMode],
+      setPaintStrength: e => {
+        const amount = Number(e.target.value);
+        this.setState(v => ({paintStrengths:{...v.paintStrengths, [v.paintMode]:amount}}), () => this.markDirty());
+      },
       paintModes: [['solid','Solid','Solid colour'],['tint','Tint','Tint colour'],['darken','Darken','Darken'],['lighten','Lighten','Lighten']].map(([id,short,label]) => ({
         id, short, label,
         icon: id==='solid'
@@ -2255,7 +2334,7 @@ class Component extends React.Component {
 
       sizes: [16,32,48,64].map(n => ({ label:n+'²', title:(s.workspace==='atlas'?'Resize this sprite to ':'Resize canvas to ')+n+'×'+n, on:D.w===n && D.h===n, pick:()=>this.resizeCurrent(n,n) })),
       dimsText: D.w + '×' + D.h,
-      dimsTitle: s.workspace==='atlas' ? 'This sprite’s size — type W×H (e.g. 32x64). Only this sprite changes.' : 'Canvas size — type W×H (e.g. 32x64). Resizes all frames & tiles.',
+      dimsTitle: s.workspace==='atlas' ? 'This sprite’s size — type W×H (e.g. 32x64). Only this sprite changes.' : s.workspace==='tiles' ? 'Tile size — type W×H (e.g. 32x64). Resizes tiles only.' : 'Animation size — type W×H (e.g. 32x64). Resizes frames only.',
       setDimsText: e => {
         const m = String(e.target.value).toLowerCase().match(/(\d+)\s*[x×,\s]\s*(\d+)/);
         if (m) this.resizeCurrent(parseInt(m[1],10), parseInt(m[2],10));
@@ -2571,6 +2650,11 @@ class Component extends React.Component {
                   </Hov>
                 ))}
               </div>
+              {R.paintMode !== 'solid' && <label style={css("display:flex;flex-direction:column;align-items:center;gap:8px;padding:5px 5px 12px;color:var(--gold)")}>
+                <span style={css("font-size:7px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)")}>Strength</span>
+                <output style={css("font-size:10px;font-variant-numeric:tabular-nums")}>{R.paintStrength}%</output>
+                <input type="range" min="0" max="100" step="1" value={R.paintStrength} onChange={R.setPaintStrength} aria-label={R.paintMode + ' strength'} style={{writingMode:'vertical-lr', direction:'rtl', width:'20px', height:'110px', accentColor:'var(--gold)', cursor:'pointer'}} />
+              </label>}
             </div>
           </div>
 
@@ -2851,6 +2935,17 @@ class Component extends React.Component {
 
             {R.isFrames && (
               <div style={css("display:flex;flex-direction:column;gap:7px")}>
+                <label style={css("display:flex;flex-direction:column;gap:4px;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)")}>
+                  Animation sheet
+                  <select aria-label="Animation sheet" value={R.activeAnimation} onChange={R.selectAnimation} style={css("width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:4px;color:var(--fg);padding:5px;font-size:11px")}>
+                    {R.animationSheets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </label>
+                <div style={css("display:flex;gap:4px")}>
+                  <Hov onClick={R.addAnimation} title="Add a new animation sheet" s="flex:1;padding:4px;background:transparent;border:1px solid var(--gold);border-radius:3px;color:var(--gold);cursor:pointer;font-size:10px">+ Sheet</Hov>
+                  <Hov onClick={R.renameAnimation} title="Rename animation sheet" s="flex:1;padding:4px;background:transparent;border:1px solid var(--line);border-radius:3px;color:var(--dim);cursor:pointer;font-size:10px">Rename</Hov>
+                </div>
+                <Hov onClick={R.saveAnimation} title="Save only this animation as a project; Save in the top bar saves all sheets" s="padding:4px;background:transparent;border:1px solid var(--line);border-radius:3px;color:var(--dim);cursor:pointer;font-size:10px">Save sheet</Hov>
                 <div style={css("display:flex;gap:3px")}>
                   <Hov title="Add empty frame" onClick={R.addFrame} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></Hov>
                   <Hov title="Duplicate frame" onClick={R.dupFrame} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><rect x="9" y="9" width="12" height="12" rx="1"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg></Hov>

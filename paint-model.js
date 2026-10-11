@@ -7,13 +7,23 @@
 
   const MODES = ['solid', 'tint', 'darken', 'lighten'];
 
+  const DEFAULT_STRENGTHS = { tint:35, darken:100, lighten:100 };
+  function paintStrengths(saved = {}) {
+    return Object.fromEntries(Object.entries(DEFAULT_STRENGTHS).map(([mode, fallback]) =>
+      [mode, Number.isFinite(saved?.[mode]) ? Math.max(0, Math.min(100, saved[mode])) : fallback]));
+  }
+
   /** Apply a paint mode to one pixel. Transparent pixels are only affected by solid paint. */
-  function applyPaintMode(current, colour, mode, stepColour, mixColour) {
+  function applyPaintMode(current, colour, mode, stepColour, mixColour, strength = DEFAULT_STRENGTHS[mode]) {
     if (mode === 'solid') return colour;
     if (current == null) return current;
-    if (mode === 'tint') return mixColour(current, colour, 0.35);
-    if (mode === 'darken') return stepColour(current, -1);
-    if (mode === 'lighten') return stepColour(current, 1);
+    const amount = Math.max(0, Math.min(100, strength)) / 100;
+    if (amount === 0) return current;
+    if (mode === 'tint') return mixColour(current, colour, amount);
+    if (mode === 'darken' || mode === 'lighten') {
+      const target = stepColour(current, mode === 'darken' ? -1 : 1);
+      return amount === 1 ? target : mixColour(current, target, amount);
+    }
     throw new Error('Unknown paint mode: ' + mode);
   }
 
@@ -33,5 +43,5 @@
     }
   }
 
-  return { MODES, applyPaintMode, floodPaint };
+  return { MODES, DEFAULT_STRENGTHS, paintStrengths, applyPaintMode, floodPaint };
 });

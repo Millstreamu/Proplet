@@ -26,3 +26,20 @@ test('fill transforms only the connected source-colour region', () => {
   floodPaint(pixels, 3, 2, 0, 0, colour => colour.toUpperCase());
   assert.deepEqual(pixels, ['A', 'A', 'b', 'A', 'b', 'b']);
 });
+
+test('paint strength controls tint and shade blending, including zero effect', () => {
+  assert.equal(applyPaintMode('a', 'b', 'tint', step, mix, 70), 'a:b:0.7');
+  assert.equal(applyPaintMode('a', 'b', 'darken', step, mix, 20), 'a:a-:0.2');
+  assert.equal(applyPaintMode('a', 'b', 'lighten', step, mix, 80), 'a:a+:0.8');
+  for (const mode of ['tint', 'darken', 'lighten']) {
+    assert.equal(applyPaintMode('a', 'b', mode, step, mix, 0), 'a');
+    assert.equal(applyPaintMode(null, 'b', mode, step, mix, 80), null);
+  }
+});
+
+test('restores independent strengths and supplies defaults for old projects', () => {
+  const { paintStrengths } = require('../paint-model.js');
+  assert.deepEqual(paintStrengths(), {tint:35, darken:100, lighten:100});
+  assert.deepEqual(paintStrengths({tint:70, darken:20, lighten:80}), {tint:70, darken:20, lighten:80});
+  assert.deepEqual(paintStrengths({tint:-5, darken:120, lighten:'bad'}), {tint:0, darken:100, lighten:100});
+});
