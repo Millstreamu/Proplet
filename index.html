@@ -82,6 +82,21 @@ function Hov(props){
   }, children);
 }
 
+/* Sidebar preferences are local UI state, separate from project data. */
+function SidebarSection({title, children}){
+  const [open, setOpen] = React.useState(() => {
+    try { return localStorage.getItem('proplet.sidebar.' + title) !== 'closed'; } catch { return true; }
+  });
+  return <details open={open} onToggle={e => {
+    const next = e.currentTarget.open;
+    setOpen(next);
+    try { localStorage.setItem('proplet.sidebar.' + title, next ? 'open' : 'closed'); } catch {}
+  }} style={css("padding:12px 14px;border-bottom:1px solid var(--line);flex:none")}>
+    <summary style={css("cursor:pointer;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);user-select:none")}>{title}</summary>
+    <div style={css("padding-top:10px")}>{children}</div>
+  </details>;
+}
+
 /* Text input that commits on blur / Enter (matches the prototype's onChange
    inputs, which fire on commit rather than per keystroke). */
 function CommitInput(props){
@@ -1961,7 +1976,8 @@ class Component extends React.Component {
       { label:'Paste sprite code…', note:'', click:close(()=>this.setState({ pasteOpen:true, pasteMsg:'' })) },
       { label:'Export PNG', note:'', click:close(()=>this.exportPng()) },
       { label:'Export Sprite Sheet…', note:'', click:close(()=>this.setState({sheetOpen:true})) },
-      { label:'Export Tile Set…', note:'', click:close(()=>this.setState({tileSheetOpen:true})) }
+      { label:'Export Tile Set…', note:'', click:close(()=>this.setState({tileSheetOpen:true})) },
+      { label:'Export Atlas…', note:'', click:close(()=>this.setState({atlasSheetOpen:true})) }
     ];
     if (m.kind === 'tag'){
       const t = s.tags[m.i];
@@ -2540,9 +2556,9 @@ class Component extends React.Component {
   render(){
     const R = this.renderVals();
     return (
-      <div style={css("height:100vh;min-height:660px;min-width:1180px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr auto auto;background:var(--bg0)")}>
+      <div style={css("height:100vh;min-height:660px;min-width:760px;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto;background:var(--bg0)")}>
 
-        <header style={css("display:flex;align-items:center;gap:16px;height:50px;padding:0 14px;background:var(--bg1);border-bottom:1px solid var(--line)")}>
+        <header style={css("display:flex;align-items:center;gap:10px;min-height:50px;flex-wrap:wrap;padding:8px 14px;background:var(--bg1);border-bottom:1px solid var(--line)")}>
           <div style={css("display:flex;align-items:baseline;gap:9px;padding-right:15px;border-right:1px solid var(--line);line-height:1;flex:none;white-space:nowrap")}>
             <span style={css("font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:.01em;color:var(--fg)")}>Pixel Studio</span>
             <span style={css("font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)")}>Sprite Ed.</span>
@@ -2569,37 +2585,17 @@ class Component extends React.Component {
             <div style={css("font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)")}>{R.fileSavedText}</div>
           </div>
 
-          <div style={css("margin-left:auto;display:flex;align-items:center;gap:10px;flex:none;white-space:nowrap")}>
-            <span style={css("font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-variant-numeric:tabular-nums")}>{R.frameCount} frames · {R.totalMs}</span>
-            <button onClick={R.openExport} className="btn btn-primary" style={css("gap:8px")}><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export</button>
-          </div>
         </header>
 
-        <div style={css("display:flex;align-items:center;gap:14px;height:38px;padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--line)")}>
-          <div style={css("display:flex;align-items:center;gap:3px;flex:none")}>
-            {R.viewToggles.map((vt,i)=>(
-              <Hov key={i} onClick={vt.click} title={vt.tip} s="position:relative;display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:11px;letter-spacing:.05em;color:var(--dim);white-space:nowrap" sh="color:var(--fg);border-color:rgba(236,231,222,.3)">
-                {vt.on && <span style={css("position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px")}></span>}
-                <span style={css("position:relative;display:block")}>{vt.icon}</span>
-                <span style={css("position:relative")}>{vt.label}</span>
-              </Hov>
-            ))}
-          </div>
-
-          <div style={css("width:1px;height:20px;background:var(--line);flex:none")}></div>
-
-          <div style={css("display:flex;align-items:center;gap:7px;flex:none;white-space:nowrap")}>
-            <span style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)")}>Size</span>
+        <div style={css("display:flex;align-items:center;gap:14px;min-height:38px;flex-wrap:wrap;padding:4px 14px;background:var(--bg2);border-bottom:1px solid var(--line)")}>
             <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
-              {R.sizes.map((sz,i)=>(
-                <Hov key={i} onClick={sz.pick} title={sz.title} s="position:relative;padding:4px 8px;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;letter-spacing:.05em;font-variant-numeric:tabular-nums;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                  {sz.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                  <span style={css("position:relative")}>{sz.label}</span>
+              {R.workspaces.map((w,i)=>(
+                <Hov key={i} onClick={w.pick} title={w.tip} s="position:relative;flex:1;padding:5px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
+                  {w.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                  <span style={css("position:relative")}>{w.label}</span>
                 </Hov>
               ))}
             </div>
-            <CommitInput value={R.dimsText} commit={R.setDimsText} title={R.dimsTitle} style={css("width:62px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--fg);font-size:11px;text-align:center;font-variant-numeric:tabular-nums;padding:4px 4px;outline:none")} />
-          </div>
 
           <div style={css("display:flex;align-items:center;gap:2px;flex:none;border:1px solid var(--line);border-radius:4px;padding:1px")}>
             <Hov title="Zoom out" onClick={R.zoomOut} s="width:24px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:3px;cursor:pointer;color:var(--dim)" sh="color:var(--fg);background:rgba(236,231,222,.08)"><svg width="14" height="14" viewBox="0 0 24 24" className="ic"><path d="M5 12h14"></path></svg></Hov>
@@ -2628,16 +2624,18 @@ class Component extends React.Component {
           </div>
         </div>
 
-        <div style={css("display:grid;grid-template-columns:auto 1fr auto;min-height:0")}>
+        <div style={css("display:grid;grid-template-columns:auto 1fr auto;min-height:0;overflow:hidden")}>
 
-          <div style={css("display:flex;background:var(--bg1)")}>
-            <nav style={css("display:flex;flex-direction:column;gap:3px;padding:9px 7px;border-right:1px solid var(--line)")}>
+          <div style={css("display:flex;min-height:0;overflow:hidden;background:var(--bg1)")}>
+            <nav style={css("display:flex;flex-direction:column;gap:3px;padding:9px 7px;border-right:1px solid var(--line);overflow-y:auto;min-height:0")}>
               {R.tools.map((t,i)=>(
-                <Hov key={i} title={t.tip} onClick={t.pick} onMouseEnter={t.hover} onMouseLeave={R.clearHint} s="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--dim);cursor:pointer" sh="background:rgba(236,231,222,.07);color:var(--fg)">
+                <Hov key={i} title={t.tip} onClick={t.pick} onMouseEnter={t.hover} onMouseLeave={R.clearHint} s="position:relative;flex:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--dim);cursor:pointer" sh="background:rgba(236,231,222,.07);color:var(--fg)">
                   {t.on && <span style={css("position:absolute;inset:0;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:4px")}></span>}
                   <span style={css("position:relative;display:block")}>{t.icon}</span>
                 </Hov>
               ))}
+              <div style={css("border-top:1px solid var(--line);margin:5px 0")}></div>
+              {R.viewToggles.map(vt => <Hov key={vt.label} onClick={vt.click} title={vt.tip} aria-label={vt.label} aria-pressed={vt.on} s="position:relative;flex:none;display:flex;align-items:center;justify-content:center;width:38px;height:34px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sx={vt.on ? {color:'var(--gold)',borderColor:'var(--gold)',background:'rgba(225,173,102,.15)'} : {}}>{vt.icon}</Hov>)}
             </nav>
             <div style={{...css("display:flex;flex-direction:column;overflow:hidden;transition:width .18s ease, opacity .18s ease"), width: R.hasPaintMode?'58px':'0px', opacity: R.hasPaintMode?1:0, pointerEvents: R.hasPaintMode?'auto':'none', borderRight: R.hasPaintMode?'1px solid var(--line)':'0'}}>
               <div style={css("padding:9px 0 5px;text-align:center;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)")}>Paint</div>
@@ -2663,17 +2661,7 @@ class Component extends React.Component {
               <canvas ref={R.mainRef} onPointerDown={R.onDown} onPointerMove={R.onMove} onPointerUp={R.onUp} onPointerLeave={R.onLeave} style={{...css("display:block;image-rendering:pixelated;touch-action:none;box-shadow:0 0 0 1px rgba(236,231,222,.18), 0 18px 44px rgba(0,0,0,.55)"), cursor:R.mainCursor}}></canvas>
             </div>
 
-            <div style={css("position:absolute;right:14px;top:12px;display:flex;align-items:center;gap:7px;padding:4px 5px 4px 9px;background:rgba(21,19,15,.9);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(3px);white-space:nowrap")} title="Canvas background (view only)">
-              <span style={css("font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)")}>Canvas</span>
-              <div style={css("display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden")}>
-                {R.viewBackgrounds.map(bg=>(
-                  <Hov key={bg.label} onClick={bg.pick} title={bg.tip} s="position:relative;padding:4px 8px;background:transparent;border:0;border-left:1px solid var(--line);font-size:10px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                    {bg.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                    <span style={css("position:relative")}>{bg.label}</span>
-                  </Hov>
-                ))}
-              </div>
-            </div>
+
 
             {R.hasSel && (
               <div style={css("position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:2px;padding:4px;background:rgba(21,19,15,.9);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(3px)")}>
@@ -2689,10 +2677,10 @@ class Component extends React.Component {
             )}
           </main>
 
-          <aside style={css("width:270px;display:flex;flex-direction:column;background:var(--bg1);border-left:1px solid var(--line);overflow-y:auto")}>
+          <aside style={css("width:clamp(220px,24vw,270px);display:flex;flex-direction:column;background:var(--bg1);border-left:1px solid var(--line);overflow-y:auto")}>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
-              <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:11px")}>Colour</div>
+            <SidebarSection title="Colour">
+
               <div style={css("display:flex;gap:11px;align-items:flex-start")}>
                 <div style={css("position:relative;width:76px;height:62px;flex:none")}>
                   <div style={{...css("position:absolute;right:0;bottom:0;width:42px;height:38px;border:1px solid var(--line)"), background:R.bgColor}}></div>
@@ -2708,21 +2696,37 @@ class Component extends React.Component {
                   <Hov onClick={R.swapColors} s="display:flex;align-items:center;justify-content:center;gap:6px;padding:5px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);font-size:11px;cursor:pointer" sh="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="13" height="13" viewBox="0 0 24 24" className="ic"><path d="M16 3l4 4-4 4"></path><path d="M20 7H4"></path><path d="M8 21l-4-4 4-4"></path><path d="M4 17h16"></path></svg>Swap</Hov>
                 </div>
               </div>
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
-              <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:9px")}>Recent</div>
+            <SidebarSection title="Canvas">
+              <label style={css("display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--dim);margin-bottom:12px")}>
+                Width × height
+                <CommitInput aria-label="Canvas dimensions" value={R.dimsText} commit={R.setDimsText} title={R.dimsTitle} style={css("width:85px;background:var(--bg2);border:1px solid var(--line);border-radius:4px;color:var(--fg);padding:6px;font-size:12px;text-align:center")} />
+              </label>
+              <div style={css("font-size:10px;color:var(--dim);margin-bottom:5px")} title="Canvas background (view only)">Background · view only</div>
+              <div style={css("display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden")}>
+                {R.viewBackgrounds.map(bg=>(
+                  <Hov key={bg.label} onClick={bg.pick} title={bg.tip} s="position:relative;padding:4px 8px;background:transparent;border:0;border-left:1px solid var(--line);font-size:10px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
+                    {bg.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
+                    <span style={css("position:relative")}>{bg.label}</span>
+                  </Hov>
+                ))}
+              </div>
+</SidebarSection>
+
+            <SidebarSection title="Recent">
+
               <div style={css("display:grid;grid-template-columns:repeat(12,1fr);gap:3px")}>
                 {R.recents.map((r,i)=>(
                   <Hov key={i} onClick={r.pick} title={r.title} s="position:relative;aspect-ratio:1;border:1px solid rgba(0,0,0,.45);border-radius:2px;cursor:pointer;padding:0" sx={{background:r.color}}></Hov>
                 ))}
               </div>
               {R.noRecents && <div style={css("font-size:10px;color:var(--dim);font-style:italic")}>Colours you paint with collect here.</div>}
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
+            <SidebarSection title="Palette">
               <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:10px")}>
-                <span style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)")}>Palette</span>
+
                 <Hov onClick={R.addSwatch} title="Add current colour to the palette" s="display:flex;align-items:center;gap:5px;background:transparent;border:0;color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:0" sh="color:var(--gold)"><svg width="12" height="12" viewBox="0 0 24 24" className="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Add</Hov>
               </div>
               <div style={css("display:grid;grid-template-columns:repeat(10,1fr);gap:3px")}>
@@ -2732,11 +2736,11 @@ class Component extends React.Component {
                   </Hov>
                 ))}
               </div>
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
+            <SidebarSection title="Palette ramps">
               <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:4px")}>
-                <span style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)")}>Palette ramps</span>
+
                 <Hov onClick={R.addRamp} title="Start a new ramp from the current colour" s="background:transparent;border:0;color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:0" sh="color:var(--gold)">New ramp</Hov>
               </div>
               <div style={css("display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>
@@ -2761,11 +2765,11 @@ class Component extends React.Component {
                 ))}
               </div>
               <div style={css("margin-top:9px;font-size:10px;color:var(--dim);font-style:italic")}>Lighten steps right along a ramp, Darken steps left. Drag stops to reorder; right-click to remove.</div>
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
+            <SidebarSection title="Onion skin">
               <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:10px")}>
-                <span style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)")}>Onion skin</span>
+
                 <Hov onClick={R.toggleOnion} s="position:relative;padding:3px 9px;background:transparent;border:1px solid var(--line);border-radius:3px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
                   {R.onionOn && <span style={css("position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:3px")}></span>}
                   <span style={css("position:relative")}>{R.onionLabel}</span>
@@ -2802,11 +2806,11 @@ class Component extends React.Component {
                   </div>
                 </div>
               </div>
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
+            <SidebarSection title="Reference">
               <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:10px")}>
-                <span style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)")}>Reference</span>
+
                 {R.hasRef && (
                   <Hov onClick={R.toggleRefOn} s="position:relative;padding:3px 9px;background:transparent;border:1px solid var(--line);border-radius:3px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
                     {R.refOn && <span style={css("position:absolute;inset:-1px;border:1px solid var(--gold);background:rgba(225,173,102,.15);border-radius:3px")}></span>}
@@ -2848,10 +2852,10 @@ class Component extends React.Component {
                   </div>
                 </div>
               )}
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px;border-bottom:1px solid var(--line)")}>
-              <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:11px")}>Preview</div>
+            <SidebarSection title="Preview">
+
               <div style={css("display:flex;gap:13px;align-items:center")}>
                 <div style={css("width:96px;height:96px;flex:none;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;background:var(--bg0);overflow:hidden")}>
                   <canvas ref={R.previewRef} style={css("display:block;image-rendering:pixelated")}></canvas>
@@ -2892,10 +2896,10 @@ class Component extends React.Component {
                   )}
                 </div>
               </div>
-            </section>
+            </SidebarSection>
 
-            <section style={css("padding:13px 14px")}>
-              <div style={css("font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:10px")}>Shortcuts</div>
+            <SidebarSection title="Shortcuts">
+
               <div style={css("display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px;color:var(--dim)")}>
                 <span style={css("color:var(--fg);letter-spacing:.1em")}>P E I F</span><span>Pencil · Eraser · Pick · Fill</span>
                 <span style={css("color:var(--fg);letter-spacing:.1em")}>R C X</span><span>Rectangle · Circle · Tint</span>
@@ -2906,28 +2910,17 @@ class Component extends React.Component {
                 <span style={css("color:var(--fg);letter-spacing:.1em")}>⌘C ⌘X ⌘V</span><span>Copy · Cut · Paste</span>
                 <span style={css("color:var(--fg);letter-spacing:.1em")}>⌘Z ⇧⌘Z</span><span>Undo · Redo</span>
               </div>
-            </section>
+            </SidebarSection>
           </aside>
         </div>
 
         <section style={css("background:var(--bg1);border-top:1px solid var(--line);padding:9px 14px;display:flex;align-items:stretch;gap:13px;min-width:0;min-height:0")}>
           <div style={css("display:flex;flex-direction:column;gap:7px;flex:none;width:150px")}>
-            <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
-              {R.workspaces.map((w,i)=>(
-                <Hov key={i} onClick={w.pick} title={w.tip} s="position:relative;flex:1;padding:5px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                  {w.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                  <span style={css("position:relative")}>{w.label}</span>
-                </Hov>
-              ))}
-            </div>
+
 
             {R.isTiles && (
               <div style={css("display:flex;flex-direction:column;gap:7px")}>
                 <div style={css("display:flex;gap:3px")}>
-                  <Hov title="New tile" onClick={R.addTile} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></Hov>
-                  <Hov title="Duplicate tile" onClick={R.dupTileBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><rect x="9" y="9" width="12" height="12" rx="1"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg></Hov>
-                  <Hov title="Rename tile" onClick={R.renameTileBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L7.5 19.5 3 21l1.5-4.5z"></path></svg></Hov>
-                  <Hov title="Delete tile" onClick={R.delTileBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:#e0836d;border-color:#e0836d"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></Hov>
                 </div>
                 <div style={css("font-size:10px;color:var(--dim);font-style:italic")}>{R.tileCountText} · {R.dimText}</div>
               </div>
@@ -2947,10 +2940,6 @@ class Component extends React.Component {
                 </div>
                 <Hov onClick={R.saveAnimation} title="Save only this animation as a project; Save in the top bar saves all sheets" s="padding:4px;background:transparent;border:1px solid var(--line);border-radius:3px;color:var(--dim);cursor:pointer;font-size:10px">Save sheet</Hov>
                 <div style={css("display:flex;gap:3px")}>
-                  <Hov title="Add empty frame" onClick={R.addFrame} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></Hov>
-                  <Hov title="Duplicate frame" onClick={R.dupFrame} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><rect x="9" y="9" width="12" height="12" rx="1"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg></Hov>
-                  <Hov title="Duplicate + transform" onClick={R.dupTransform} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><rect x="3" y="3" width="8" height="8" rx="1"></rect><path d="M14 7h5a2 2 0 0 1 2 2v5"></path><path d="M18 17l3-3-3-3"></path><path d="M13 13h8v8h-8z"></path></svg></Hov>
-                  <Hov title="Delete frame" onClick={R.delFrame} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:#e0836d;border-color:#e0836d"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></Hov>
                 </div>
                 <div style={css("display:flex;align-items:center;gap:5px")}>
                   <span style={css("font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);white-space:nowrap")}>Hold</span>
@@ -2967,10 +2956,6 @@ class Component extends React.Component {
             {R.isAtlas && (
               <div style={css("display:flex;flex-direction:column;gap:7px")}>
                 <div style={css("display:flex;gap:3px")}>
-                  <Hov title="New sprite (inherits current size)" onClick={R.addAtlasBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg></Hov>
-                  <Hov title="Duplicate sprite" onClick={R.dupAtlasBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><rect x="9" y="9" width="12" height="12" rx="1"></rect><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg></Hov>
-                  <Hov title="Rename sprite" onClick={R.renameAtlasBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:var(--gold);border-color:var(--gold)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L7.5 19.5 3 21l1.5-4.5z"></path></svg></Hov>
-                  <Hov title="Delete sprite" onClick={R.delAtlasBtn} s="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--dim)" sh="color:#e0836d;border-color:#e0836d"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></Hov>
                 </div>
                 <div style={css("font-size:10px;color:var(--dim);font-style:italic")}>{R.atlasCountText}</div>
               </div>
@@ -3001,7 +2986,7 @@ class Component extends React.Component {
 
             <div style={css("flex:1;min-height:0;display:flex;gap:9px;overflow-x:auto;padding:2px 2px 6px")}>
               {R.isAtlas && R.atlasEmpty && (
-                <div style={css("display:flex;align-items:center;height:100%;padding:0 6px;font-size:11px;color:var(--dim);font-style:italic")}>No sprites yet — click the + to add one, then set its size in the toolbar (each sprite keeps its own).</div>
+                <div style={css("display:flex;align-items:center;height:100%;padding:0 6px;font-size:11px;color:var(--dim);font-style:italic")}>No sprites yet — click the + to add one, then set its size in the Canvas panel (each sprite keeps its own).</div>
               )}
               {R.cards.map((fr,i)=>(
                 <Hov key={i} tag="div" draggable="true" onDragStart={fr.dragStart} onDragOver={fr.dragOver} onDrop={fr.drop} onClick={fr.pick} onDoubleClick={fr.dup} onContextMenu={fr.menu} title={fr.title} s="position:relative;flex:none;width:86px;padding:6px 6px 5px;border:1px solid var(--line);border-radius:4px;background:var(--bg2);cursor:pointer" sh="border-color:rgba(236,231,222,.34)">
@@ -3022,13 +3007,13 @@ class Component extends React.Component {
                   <div style={{...css("position:relative;margin-top:2px;font-size:9.5px;letter-spacing:.1em;font-variant-numeric:tabular-nums"), color:'var(--gold)'}}>{fr.sub}</div>
                 </Hov>
               ))}
+              <Hov onClick={R.isTiles ? R.addTile : R.isAtlas ? R.addAtlasBtn : R.addFrame} title={R.isTiles ? 'New tile' : R.isAtlas ? 'New sprite' : 'Add empty frame'} aria-label={R.isTiles ? 'New tile' : R.isAtlas ? 'New sprite' : 'Add empty frame'} s="flex:none;align-self:stretch;min-height:90px;width:66px;border:1px dashed var(--line);border-radius:4px;background:transparent;color:var(--gold);font-size:28px;cursor:pointer" sh="border-color:var(--gold);background:rgba(225,173,102,.06)">+</Hov>
+
             </div>
           </div>
         </section>
 
         <footer style={css("display:flex;align-items:center;gap:16px;height:26px;padding:0 14px;background:var(--bg2);border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.08em;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden")}>
-          {R.statusBits.map((b,i)=>(<span key={i}>{b.text}</span>))}
-          <span>Tool: {R.toolName}</span>
           <span>{R.coordText}</span>
           <span style={css("display:flex;align-items:center;gap:6px;color:var(--gold)")}><span style={css("width:6px;height:6px;border-radius:50%;background:var(--gold)")}></span>{R.autoStatus}</span>
           <span style={css("margin-left:auto;color:var(--gold);font-style:italic;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis")}>{R.hint}</span>
