@@ -98,20 +98,21 @@ function SidebarSection({title, children}){
   </details>;
 }
 
-function MetadataEditor({asset, width, height, animations, apply, bulk, selectedCount}){
+function MetadataEditor({asset, width, height, animations, apply, bulk, selectedCount, categories, addCategory}){
   const [draft,setDraft]=React.useState(()=>PixelStudioMetadata.metadata(asset));
   const [shape,setShape]=React.useState(()=>JSON.stringify(draft.collision.shape));
   const [properties,setProperties]=React.useState(()=>JSON.stringify(draft.properties));
   const [placement,setPlacement]=React.useState(()=>JSON.stringify({pivot:draft.pivot,groundAnchor:draft.groundAnchor,footprint:draft.footprint}));
   const [terrain,setTerrain]=React.useState(()=>JSON.stringify(draft.terrain));
+  const [newCategory,setNewCategory]=React.useState('');
   const [errors,setErrors]=React.useState([]);
   const [message,setMessage]=React.useState('');
   const inputStyle=css('width:100%;min-width:0;background:var(--bg2);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:5px;font-size:11px');
   const field=(label,value,set,help)=> <label style={css('display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)')}>{label}<input aria-label={label} value={value} onChange={e=>{set(e.target.value);setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}/>{help&&<small>{help}</small>}</label>;
   const commit=all=>{
     try{
-      const p=JSON.parse(placement);
-      const next={...draft,pivot:p.pivot,groundAnchor:p.groundAnchor??null,footprint:p.footprint??null,terrain:JSON.parse(terrain),collision:{...draft.collision,shape:JSON.parse(shape)},properties:JSON.parse(properties)};
+      const p=draft.enabled.placement?JSON.parse(placement):{};
+      const next={...draft,pivot:p.pivot??draft.pivot,groundAnchor:draft.enabled.placement?(p.groundAnchor??null):draft.groundAnchor,footprint:draft.enabled.placement?(p.footprint??null):draft.footprint,terrain:draft.enabled.terrain?JSON.parse(terrain):draft.terrain,collision:{...draft.collision,shape:draft.enabled.collision?JSON.parse(shape):draft.collision.shape},properties:draft.enabled.properties?JSON.parse(properties):draft.properties};
       const problems=PixelStudioMetadata.validate(next,width,height,animations.map(a=>a.id));
       if(problems.length){setErrors(problems);return;}
       const result=all?bulk(next):apply(next);
@@ -122,15 +123,25 @@ function MetadataEditor({asset, width, height, animations, apply, bulk, selected
   return <div style={css('display:flex;flex-direction:column;gap:10px')}>
     <strong style={css('font-size:12px;color:var(--fg)')}>{asset.name}</strong>
     <small style={css('color:var(--dim);overflow-wrap:anywhere')}>ID: {asset.id}</small>
-    <label style={css('font-size:11px')}>Start from preset<select aria-label="Metadata preset" defaultValue="" onChange={e=>{const preset=PixelStudioMetadata.PRESETS[e.target.value];if(preset){setDraft({...draft,...preset});setShape(JSON.stringify(preset.collision.shape));setMessage('Preset pending — Apply metadata to save.');}}} style={inputStyle}><option value="">Choose…</option>{Object.keys(PixelStudioMetadata.PRESETS).map(k=><option key={k}>{k}</option>)}</select></label>
-    {field('Category',draft.category,v=>setDraft({...draft,category:v}),'character, prop, decoration, ground, terrain, item, effect, ui, or your own category')}
-    <label style={css('font-size:11px')}>Collision mode<select aria-label="Collision mode" value={draft.collision.mode} onChange={e=>{setDraft({...draft,collision:{...draft.collision,mode:e.target.value}});setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}>{['none','solid','trigger','one-way'].map(k=><option key={k}>{k}</option>)}</select></label>
-    {field('Collision shape JSON',shape,setShape,'{"type":"bounds"}, {"type":"rectangle","x":0,"y":0,"w":8,"h":8}, or {"type":"polygon","points":[{"x":0,"y":0},{"x":8,"y":0},{"x":4,"y":8}]}')}
-    {field('Placement JSON',placement,setPlacement,'Pivot: normalized 0–1. Ground anchor: local pixels or null. Footprint: {"w":1,"h":1} tile cells or null.')}
-    {field('Tags',draft.tags.join(', '),v=>setDraft({...draft,tags:[...new Set(v.split(',').map(t=>t.trim()).filter(Boolean))]}))}
-    {field('Custom properties JSON',properties,setProperties,'Example: {"damage":10,"interactable":true,"material":"wood"}')}
-    {asset.kind==='terrain'||draft.category==='terrain'?field('Terrain JSON',terrain,setTerrain,'{"family":"grass","corners":["grass","grass","dirt","dirt"]} · TL, TR, BR, BL'):null}
-    <label style={css('font-size:11px')}>Linked animation<select aria-label="Linked animation" value={draft.animationId||''} onChange={e=>{setDraft({...draft,animationId:e.target.value||null});setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}><option value="">None</option>{animations.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+    <label style={css('font-size:11px')}>Start from preset<select aria-label="Metadata preset" defaultValue="" onChange={e=>{const preset=PixelStudioMetadata.PRESETS[e.target.value];if(preset){setDraft({...draft,...preset,enabled:{...draft.enabled,category:true,collision:preset.collision.mode!=='none'}});setShape(JSON.stringify(preset.collision.shape));setMessage('Preset pending — Apply metadata to save.');}}} style={inputStyle}><option value="">Choose…</option>{Object.keys(PixelStudioMetadata.PRESETS).map(k=><option key={k}>{k}</option>)}</select></label>
+    {['category','collision','placement','tags','properties','terrain','animationId'].map(key=>{
+      const names={category:'Category',collision:'Collision',placement:'Placement',tags:'Tags',properties:'Custom properties',terrain:'Terrain',animationId:'Linked animation'};
+      return <div key={key} style={css('border-top:1px solid var(--line);padding-top:9px')}>
+        <label style={css('display:flex;gap:8px;align-items:center;font-size:12px')}><input type="checkbox" checked={!!draft.enabled[key]} onChange={e=>{setDraft({...draft,enabled:{...draft.enabled,[key]:e.target.checked}});setMessage('Changes pending — Apply metadata to save.');}}/>Include {names[key]}</label>
+        {draft.enabled[key]&&<div style={css('padding-top:8px;display:flex;flex-direction:column;gap:7px')}>
+          {key==='category'&&<>
+            <select aria-label="Category" value={draft.category} onChange={e=>{setDraft({...draft,category:e.target.value});setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}><option value="">Not specified</option>{[...new Set(categories.concat(draft.category).filter(Boolean))].map(c=><option key={c}>{c}</option>)}</select>
+            <div style={css('display:flex;gap:6px')}><input aria-label="New category" placeholder="New category" value={newCategory} onChange={e=>setNewCategory(e.target.value)} style={inputStyle}/><button className="btn" style={{flex:'none',whiteSpace:'nowrap'}} onClick={()=>{const name=newCategory.trim();if(name){addCategory(name);setDraft({...draft,category:name});setNewCategory('');setMessage('Category added — Apply metadata to save.');}}}>Add category</button></div>
+          </>}
+          {key==='collision'&&<><select aria-label="Collision mode" value={draft.collision.mode} onChange={e=>setDraft({...draft,collision:{...draft.collision,mode:e.target.value}})} style={inputStyle}>{['none','solid','trigger','one-way'].map(k=><option key={k}>{k}</option>)}</select>{field('Collision shape JSON',shape,setShape,'Bounds, rectangle, or polygon in local pixels.')}</>}
+          {key==='placement'&&field('Placement JSON',placement,setPlacement,'Pivot: normalized 0–1. Ground anchor: local pixels or null. Footprint: tile cells or null.')}
+          {key==='tags'&&field('Tags',draft.tags.join(', '),v=>setDraft({...draft,tags:[...new Set(v.split(',').map(t=>t.trim()).filter(Boolean))]}))}
+          {key==='properties'&&field('Custom properties JSON',properties,setProperties,'Example: {"damage":10,"interactable":true,"material":"wood"}')}
+          {key==='terrain'&&field('Terrain JSON',terrain,setTerrain,'Family and TL, TR, BR, BL corners.')}
+          {key==='animationId'&&<select aria-label="Linked animation" value={draft.animationId||''} onChange={e=>setDraft({...draft,animationId:e.target.value||null})} style={inputStyle}><option value="">Not specified</option>{animations.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>}
+        </div>}
+      </div>;
+    })}
     <small style={css('color:var(--dim)')}>These fields describe intent; your game importer implements the behaviour.</small>
     {errors.length>0&&<div role="alert" style={css('color:#f09586;font-size:11px')}>{errors.join(' ')}</div>}
     <div role="status" style={css('font-size:11px;color:var(--gold)')}>{message}</div>
@@ -267,7 +278,7 @@ class Component extends React.Component {
         { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
       ],
       activeTag:'t2', tagEdit:null,
-      pngScale:1, metadataSelection:[],
+      pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
       tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
@@ -1508,7 +1519,7 @@ class Component extends React.Component {
   serialize(){
     const s = this.state;
     return {
-      format:'pixelproj', version:1, name:s.projectName, w:s.w, h:s.h,
+      format:'pixelproj', version:1, name:s.projectName, w:s.w, h:s.h, metadataCategories:s.metadataCategories,
       animations:this.animationSheets(), activeAnimation:s.activeAnimation,
       frames:s.frames.map(f=>({ id:f.id, px:f.px, sel:f.sel, dur:f.dur })),
       tags:s.tags, activeTag:s.activeTag,
@@ -1537,6 +1548,7 @@ class Component extends React.Component {
     this.undoStack = []; this.redoStack = [];
     this.setState({
       animations, activeAnimation:animation.id, metadataSelection:[],
+      metadataCategories:[...new Set(PixelStudioMetadata.CATEGORIES.concat(d.metadataCategories||[],(d.tiles||[]).concat(d.atlas||[]).map(a=>PixelStudioMetadata.metadata(a).category)).filter(Boolean))],
       projectName: d.name || 'untitled', named:!!named, dirty:false, savedAt: named ? Date.now() : null,
       w, h, tileW:ts.w || w, tileH:ts.h || h,
       frames: (d.frames && d.frames.length) ? d.frames.map((f,i)=>({ id:f.id||'f'+i, px:f.px||new Array(w*h).fill(null), sel:f.sel!==false, dur:f.dur||120 })) : this.demoFrames(w,h),
@@ -2003,13 +2015,13 @@ class Component extends React.Component {
       this.setState({hint:'Exported '+(legacy?'legacy':'v2')+' metadata'});
     }catch(e){this.setState({hint:e.message});window.alert('Cannot export metadata: '+e.message);}
   }
-  applyMetadata(metadata,bulk=false){
-    const s=this.state,key=s.workspace==='tiles'?'tiles':'atlas', active=key==='tiles'?s.activeTile:s.activeAtlas;
+  applyMetadata(metadata,bulk=false,workspace=this.state.workspace){
+    const s=this.state,key=workspace==='tiles'?'tiles':'atlas', active=key==='tiles'?s.activeTile:s.activeAtlas;
     const targets=bulk?s[key].filter(a=>s.metadataSelection.includes(a.id)):[s[key][active]];
     const errors=targets.flatMap(a=>PixelStudioMetadata.validate(metadata,key==='tiles'?s.tileW:a.w,key==='tiles'?s.tileH:a.h,s.animations.map(a=>a.id)).map(e=>a.name+': '+e));
     if(errors.length)return errors.join(' ');
     this.snap();
-    this.setState(v=>({[key]:v[key].map(a=>targets.some(t=>t.id===a.id)?{...a,metadata:JSON.parse(JSON.stringify(metadata)),kind:metadata.category==='decoration'?'decor':metadata.category,collision:metadata.collision.mode!=='none',tags:metadata.tags.join(', '),corners:metadata.terrain.corners}:a)}),()=>this.markDirty());
+    this.setState(v=>({[key]:v[key].map(a=>targets.some(t=>t.id===a.id)?{...a,metadata:JSON.parse(JSON.stringify(metadata)),kind:metadata.category==='decoration'?'decor':metadata.category,collision:metadata.enabled.collision&&metadata.collision.mode!=='none',tags:metadata.enabled.tags?metadata.tags.join(', '):'',corners:metadata.enabled.terrain?metadata.terrain.corners:[]}:a)}),()=>this.markDirty());
     return '';
   }
 
@@ -2325,7 +2337,7 @@ class Component extends React.Component {
       inspName: t ? t.name : '—',
       inspKind: t ? (t.kind || 'ground') : 'ground',
       inspKinds: TILE_KINDS.map(k => ({ id:k, label:k.charAt(0).toUpperCase()+k.slice(1), on: t && (t.kind||'ground')===k, pick:()=>this.setTileField({kind:k}) })),
-      inspIsTerrain: !!(t && PixelStudioMetadata.metadata(t).category==='terrain'),
+      inspIsTerrain: !!(t && PixelStudioMetadata.metadata(t).enabled.terrain),
       cornerLabelText: cornerLabel(t && t.corners),
       cornerCells: [['Top-left',0],['Top-right',1],['Bottom-left',3],['Bottom-right',2]].map(([pos,ci]) => ({
         pos, ci,
@@ -2434,12 +2446,6 @@ class Component extends React.Component {
       pngLabel: this.pngTarget() ? 'Export '+this.pngTarget().name+' PNG' : 'Select an asset for PNG',
       pngScale:s.pngScale,
       setPngScale:e=>this.setState({pngScale:Number(e.target.value)}),
-      metadataAsset:s.workspace==='tiles'?s.tiles[s.activeTile]:s.workspace==='atlas'?s.atlas[s.activeAtlas]:null,
-      metadataWidth:D.w, metadataHeight:D.h,
-      metadataAnimations:s.animations,
-      metadataSelectedCount:(s.workspace==='tiles'?s.tiles:s.atlas).filter(a=>s.metadataSelection.includes(a.id)).length,
-      applyMetadata:m=>this.applyMetadata(m),
-      bulkMetadata:m=>this.applyMetadata(m,true),
       metadataSelection:s.metadataSelection,
       toggleMetadataSelection:(id,checked)=>this.setState(v=>({metadataSelection:checked?[...new Set(v.metadataSelection.concat(id))]:v.metadataSelection.filter(i=>i!==id)})),
       metadataPreview:(()=>{if(!s.tileSheetOpen&&!s.atlasSheetOpen)return '';try{return JSON.stringify(this.metadataDocument(s.tileSheetOpen?'tiles':'atlas'),null,2);}catch(e){return 'Validation: '+e.message;}})(),
@@ -2799,10 +2805,6 @@ class Component extends React.Component {
               </div>
 </SidebarSection>
 
-            {R.metadataAsset && <SidebarSection title="Asset metadata">
-              <MetadataEditor key={R.metadataAsset.id} asset={R.metadataAsset} width={R.metadataWidth} height={R.metadataHeight} animations={R.metadataAnimations} apply={R.applyMetadata} bulk={R.bulkMetadata} selectedCount={R.metadataSelectedCount}/>
-              <small>Select card checkboxes to apply metadata to several assets.</small>
-            </SidebarSection>}
             <SidebarSection title="Recent">
 
               <div style={css("display:grid;grid-template-columns:repeat(12,1fr);gap:3px")}>
@@ -3302,6 +3304,7 @@ class Component extends React.Component {
                       <Hov onClick={R.addTerrain} title="Add terrain to the reusable list" s="display:flex;align-items:center;padding:4px 9px;background:transparent;border:1px dashed var(--line);border-radius:3px;color:var(--dim);font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer" sh="color:var(--gold);border-color:var(--gold)">Add new</Hov>
                     </div>
 
+<MetadataEditor key={"tiles-"+(this.state.tiles[this.state.activeTile]).id} asset={this.state.tiles[this.state.activeTile]} width={this.state.tileW} height={this.state.tileH} animations={this.state.animations} categories={this.state.metadataCategories} addCategory={name=>this.setState(v=>({metadataCategories:[...new Set(v.metadataCategories.concat(name))]}),()=>this.markDirty())} apply={m=>this.applyMetadata(m,false,"tiles")} bulk={m=>this.applyMetadata(m,true,"tiles")} selectedCount={this.state.tiles.filter(a=>this.state.metadataSelection.includes(a.id)).length}/>
                     {R.inspIsTerrain ? (
                       <div style={css("margin-bottom:15px")}>
                         <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:8px")}>
@@ -3333,7 +3336,7 @@ class Component extends React.Component {
                         </div>
                       </div>
                     ) : (
-                      <div style={css("margin-bottom:15px;font-size:10.5px;color:var(--dim);font-style:italic")}>Corners apply to Terrain tiles — set Category to “terrain” in the Asset metadata panel to assign a terrain to each corner.</div>
+                      <div style={css("margin-bottom:15px;font-size:10.5px;color:var(--dim);font-style:italic")}>Corners apply to Terrain tiles — enable Terrain metadata above to assign a terrain to each corner.</div>
                     )}
 
 
@@ -3419,7 +3422,7 @@ class Component extends React.Component {
                             <span style={css("font-size:11px;color:var(--dim)")}>px</span>
                           </div>
                         </div>
-                        <div style={css("font-size:11px;color:var(--dim)")}>Edit metadata in the right-sidebar Asset metadata panel before export.</div>
+                        <MetadataEditor key={"atlas-"+(this.state.atlas[this.state.activeAtlas]).id} asset={this.state.atlas[this.state.activeAtlas]} width={this.state.atlas[this.state.activeAtlas]?.w} height={this.state.atlas[this.state.activeAtlas]?.h} animations={this.state.animations} categories={this.state.metadataCategories} addCategory={name=>this.setState(v=>({metadataCategories:[...new Set(v.metadataCategories.concat(name))]}),()=>this.markDirty())} apply={m=>this.applyMetadata(m,false,"atlas")} bulk={m=>this.applyMetadata(m,true,"atlas")} selectedCount={this.state.atlas.filter(a=>this.state.metadataSelection.includes(a.id)).length}/>
                       </div>
                     ) : (
                       <div style={css("font-size:10.5px;color:var(--dim);font-style:italic")}>No sprites to inspect.</div>
