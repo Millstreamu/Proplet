@@ -41,6 +41,7 @@ input{font-family:inherit}
 <script src="selection-model.js"></script>
 <script src="line-model.js"></script>
 <script src="paint-model.js"></script>
+<script src="metadata-model.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -95,6 +96,47 @@ function SidebarSection({title, children}){
     <summary style={css("cursor:pointer;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);user-select:none")}>{title}</summary>
     <div style={css("padding-top:10px")}>{children}</div>
   </details>;
+}
+
+function MetadataEditor({asset, width, height, animations, apply, bulk, selectedCount}){
+  const [draft,setDraft]=React.useState(()=>PixelStudioMetadata.metadata(asset));
+  const [shape,setShape]=React.useState(()=>JSON.stringify(draft.collision.shape));
+  const [properties,setProperties]=React.useState(()=>JSON.stringify(draft.properties));
+  const [placement,setPlacement]=React.useState(()=>JSON.stringify({pivot:draft.pivot,groundAnchor:draft.groundAnchor,footprint:draft.footprint}));
+  const [terrain,setTerrain]=React.useState(()=>JSON.stringify(draft.terrain));
+  const [errors,setErrors]=React.useState([]);
+  const [message,setMessage]=React.useState('');
+  const inputStyle=css('width:100%;min-width:0;background:var(--bg2);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:5px;font-size:11px');
+  const field=(label,value,set,help)=> <label style={css('display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)')}>{label}<input aria-label={label} value={value} onChange={e=>{set(e.target.value);setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}/>{help&&<small>{help}</small>}</label>;
+  const commit=all=>{
+    try{
+      const p=JSON.parse(placement);
+      const next={...draft,pivot:p.pivot,groundAnchor:p.groundAnchor??null,footprint:p.footprint??null,terrain:JSON.parse(terrain),collision:{...draft.collision,shape:JSON.parse(shape)},properties:JSON.parse(properties)};
+      const problems=PixelStudioMetadata.validate(next,width,height,animations.map(a=>a.id));
+      if(problems.length){setErrors(problems);return;}
+      const result=all?bulk(next):apply(next);
+      if(result){setErrors([result]);return;}
+      setErrors([]);setMessage(all?'Metadata applied to selected assets.':'Metadata applied.');
+    }catch(e){setErrors(['Invalid JSON: '+e.message]);}
+  };
+  return <div style={css('display:flex;flex-direction:column;gap:10px')}>
+    <strong style={css('font-size:12px;color:var(--fg)')}>{asset.name}</strong>
+    <small style={css('color:var(--dim);overflow-wrap:anywhere')}>ID: {asset.id}</small>
+    <label style={css('font-size:11px')}>Start from preset<select aria-label="Metadata preset" defaultValue="" onChange={e=>{const preset=PixelStudioMetadata.PRESETS[e.target.value];if(preset){setDraft({...draft,...preset});setShape(JSON.stringify(preset.collision.shape));setMessage('Preset pending — Apply metadata to save.');}}} style={inputStyle}><option value="">Choose…</option>{Object.keys(PixelStudioMetadata.PRESETS).map(k=><option key={k}>{k}</option>)}</select></label>
+    {field('Category',draft.category,v=>setDraft({...draft,category:v}),'character, prop, decoration, ground, terrain, item, effect, ui, or your own category')}
+    <label style={css('font-size:11px')}>Collision mode<select aria-label="Collision mode" value={draft.collision.mode} onChange={e=>{setDraft({...draft,collision:{...draft.collision,mode:e.target.value}});setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}>{['none','solid','trigger','one-way'].map(k=><option key={k}>{k}</option>)}</select></label>
+    {field('Collision shape JSON',shape,setShape,'{"type":"bounds"}, {"type":"rectangle","x":0,"y":0,"w":8,"h":8}, or {"type":"polygon","points":[{"x":0,"y":0},{"x":8,"y":0},{"x":4,"y":8}]}')}
+    {field('Placement JSON',placement,setPlacement,'Pivot: normalized 0–1. Ground anchor: local pixels or null. Footprint: {"w":1,"h":1} tile cells or null.')}
+    {field('Tags',draft.tags.join(', '),v=>setDraft({...draft,tags:[...new Set(v.split(',').map(t=>t.trim()).filter(Boolean))]}))}
+    {field('Custom properties JSON',properties,setProperties,'Example: {"damage":10,"interactable":true,"material":"wood"}')}
+    {asset.kind==='terrain'||draft.category==='terrain'?field('Terrain JSON',terrain,setTerrain,'{"family":"grass","corners":["grass","grass","dirt","dirt"]} · TL, TR, BR, BL'):null}
+    <label style={css('font-size:11px')}>Linked animation<select aria-label="Linked animation" value={draft.animationId||''} onChange={e=>{setDraft({...draft,animationId:e.target.value||null});setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}><option value="">None</option>{animations.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+    <small style={css('color:var(--dim)')}>These fields describe intent; your game importer implements the behaviour.</small>
+    {errors.length>0&&<div role="alert" style={css('color:#f09586;font-size:11px')}>{errors.join(' ')}</div>}
+    <div role="status" style={css('font-size:11px;color:var(--gold)')}>{message}</div>
+    <button onClick={()=>commit(false)} className="btn">Apply metadata</button>
+    {selectedCount>0&&<button onClick={()=>commit(true)} className="btn">Apply to {selectedCount} selected assets</button>}
+  </div>;
 }
 
 /* Text input that commits on blur / Enter (matches the prototype's onChange
@@ -178,6 +220,7 @@ function cornerLabel(cn){
   return 'junction';
 }
 
+const assetId = prefix => prefix+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);
 const TILE_KINDS = ['ground','terrain','decor','collision','animated'];
 const ATLAS_KINDS = ['decor','prop','ground','collision','animated'];
 
@@ -224,6 +267,7 @@ class Component extends React.Component {
         { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
       ],
       activeTag:'t2', tagEdit:null,
+      pngScale:1, metadataSelection:[],
       tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
@@ -1295,12 +1339,21 @@ class Component extends React.Component {
     a.href = cv.toDataURL('image/png'); a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
   }
+  pngTarget(){
+    const s=this.state, ws=s.atlasSheetOpen?'atlas':s.tileSheetOpen?'tiles':s.sheetOpen?'frames':s.workspace;
+    if(ws==='atlas'){const a=s.atlas[s.activeAtlas];return a?{name:a.name,px:a.px,w:a.w,h:a.h}:null;}
+    if(ws==='tiles'){const t=s.tiles[s.activeTile];return t?{name:t.name,px:t.px,w:s.tileW,h:s.tileH}:null;}
+    const f=s.frames[s.active];
+    return f?{name:(s.animations.find(a=>a.id===s.activeAnimation)?.name||'animation')+'-frame-'+(s.active+1),px:f.px,w:s.w,h:s.h}:null;
+  }
   exportPng(){
-    const { w:W, h:H, frames, active } = this.state;
-    const cv = document.createElement('canvas');
-    this.draw(cv, frames[active].px, W, H, 8, false, false);
-    this.dl(cv, 'sprite-frame-'+(active+1)+'.png');
-    this.setState({hint:'Exported frame '+(active+1)+' as PNG'});
+    const target=this.pngTarget();
+    if(!target){this.setState({hint:'Select an asset before exporting PNG'});return;}
+    const cv=document.createElement('canvas'), scale=this.state.pngScale;
+    cv.width=target.w*scale;cv.height=target.h*scale;
+    this.blit(cv.getContext('2d'),target.px,target.w,target.h,scale,0,0,1,null);
+    this.dl(cv,target.name.replace(/[\\/:*?"<>|]/g,'_')+'.png');
+    this.setState({hint:'Exported '+target.name+' at '+scale+'×'});
   }
   exportSheet(){
     const cv = document.createElement('canvas');
@@ -1464,9 +1517,9 @@ class Component extends React.Component {
       tileSettings:{ w:s.tileW, h:s.tileH, on:s.tile, wrap:s.wrap, preview:s.tilePreview },
       onion:s.onion,
       sheet:{ layout:s.layout, cols:s.cols, spacing:s.spacing, padding:s.padding, transparent:s.transparent, scope:s.exportScope },
-      tiles:s.tiles.map(t=>({ id:t.id, name:t.name, px:t.px, kind:t.kind, corners:t.corners, collision:t.collision, tags:t.tags })),
+      tiles:s.tiles.map(t=>({ id:t.id, name:t.name, px:t.px, kind:t.kind, corners:t.corners, collision:t.collision, tags:t.tags, metadata:t.metadata })),
       terrains:s.terrains,
-      atlas:s.atlas.map(a=>({ id:a.id, name:a.name, w:a.w, h:a.h, px:a.px, kind:a.kind, collision:a.collision, tags:a.tags })), atlasExport:s.atlasExport, activeAtlas:s.activeAtlas,
+      atlas:s.atlas.map(a=>({ id:a.id, name:a.name, w:a.w, h:a.h, px:a.px, kind:a.kind, collision:a.collision, tags:a.tags, metadata:a.metadata })), atlasExport:s.atlasExport, activeAtlas:s.activeAtlas,
       activeTile:s.activeTile, tileExport:s.tileExport, workspace:s.workspace
     };
   }
@@ -1483,7 +1536,7 @@ class Component extends React.Component {
     const sh = d.sheet || {};
     this.undoStack = []; this.redoStack = [];
     this.setState({
-      animations, activeAnimation:animation.id,
+      animations, activeAnimation:animation.id, metadataSelection:[],
       projectName: d.name || 'untitled', named:!!named, dirty:false, savedAt: named ? Date.now() : null,
       w, h, tileW:ts.w || w, tileH:ts.h || h,
       frames: (d.frames && d.frames.length) ? d.frames.map((f,i)=>({ id:f.id||'f'+i, px:f.px||new Array(w*h).fill(null), sel:f.sel!==false, dur:f.dur||120 })) : this.demoFrames(w,h),
@@ -1545,10 +1598,10 @@ class Component extends React.Component {
     const nh = Math.max(1, Math.min(256, parseInt(s.npH,10) || 32));
     this.undoStack = []; this.redoStack = [];
     this.setState({
-      animations:[{id:'animation-1', name:'Animation 1'}], activeAnimation:'animation-1',
+      animations:[{id:'animation-1', name:'Animation 1'}], activeAnimation:'animation-1', metadataSelection:[],
       projectName:(s.npName||'untitled').trim() || 'untitled', named:false, dirty:true, savedAt:null,
       w:nw, h:nh, tileW:nw, tileH:nh, frames:[{ id:'f'+Date.now(), px:new Array(nw*nh).fill(null), sel:true, dur:120 }], active:0,
-      tags:[], activeTag:null, tiles:[{ id:'tl'+Date.now(), name:'Tile 1', px:new Array(nw*nh).fill(s.npTransparent ? null : s.bg) }],
+      tags:[], activeTag:null, tiles:[{ id:assetId('tile'), name:'Tile 1', px:new Array(nw*nh).fill(s.npTransparent ? null : s.bg) }],
       atlas:[], activeAtlas:0, atlasSheetOpen:false,
       activeTile:0, workspace:'frames', selRect:null, clip:null, playing:false, newOpen:false,
       transparent:!!s.npTransparent, restore:null,
@@ -1617,7 +1670,7 @@ class Component extends React.Component {
   addTile(){
     this.setState(s => {
       const tiles = s.tiles.slice();
-      tiles.splice(s.activeTile+1, 0, { id:'tl'+Date.now(), name:'Tile ' + (tiles.length+1), px:new Array(s.tileW*s.tileH).fill(null) });
+      tiles.splice(s.activeTile+1, 0, { id:assetId('tile'), name:'Tile ' + (tiles.length+1), px:new Array(s.tileW*s.tileH).fill(null) });
       return { tiles, activeTile:s.activeTile+1, workspace:'tiles', hint:'New tile' };
     }, () => this.markDirty());
   }
@@ -1626,7 +1679,7 @@ class Component extends React.Component {
       const i = at == null ? s.activeTile : at;
       const src = s.tiles[i];
       const tiles = s.tiles.slice();
-      tiles.splice(i+1, 0, { id:'tl'+Date.now(), name:src.name + ' copy', px:src.px.slice() });
+      tiles.splice(i+1, 0, { id:assetId('tile'), name:src.name + ' copy', metadata:src.metadata?JSON.parse(JSON.stringify(src.metadata)):undefined, kind:src.kind, collision:src.collision, tags:src.tags, corners:src.corners?.slice(), px:src.px.slice() });
       return { tiles, activeTile:i+1, hint:'Duplicated ' + src.name };
     }, () => this.markDirty());
   }
@@ -1731,12 +1784,12 @@ class Component extends React.Component {
       const tiles = v.tiles.slice(); const i = v.activeTile; const t = tiles[i]; if (!t) return null;
       const corners = (t.corners && t.corners.length === 4) ? t.corners.slice() : [null,null,null,null];
       corners[ci] = terrain;
-      tiles[i] = {...t, corners};
+      tiles[i] = {...t, corners, metadata:t.metadata?{...t.metadata,terrain:{...t.metadata.terrain,corners}}:undefined};
       return { tiles };
     }, () => this.markDirty());
   }
   fillCorners(terrain){
-    this.setState(v => { const tiles = v.tiles.slice(); const i = v.activeTile; if (!tiles[i]) return null; tiles[i] = {...tiles[i], corners:[terrain,terrain,terrain,terrain]}; return { tiles }; }, () => this.markDirty());
+    this.setState(v => { const tiles = v.tiles.slice(); const i = v.activeTile; if (!tiles[i]) return null; tiles[i] = {...tiles[i], corners:[terrain,terrain,terrain,terrain], metadata:tiles[i].metadata?{...tiles[i].metadata,terrain:{...tiles[i].metadata.terrain,corners:[terrain,terrain,terrain,terrain]}}:undefined}; return { tiles }; }, () => this.markDirty());
   }
   addTerrain(name){
     const n = (name || '').trim().toLowerCase().replace(/\s+/g,'_');
@@ -1764,9 +1817,9 @@ class Component extends React.Component {
     this.dl(cv, (this.state.projectName || 'tileset') + '-tileset.png');
     this.setState({ hint:'Exported tile set ' + g.w + '×' + g.h });
   }
-  tileMeta(){
+  legacyTileMeta(){
     const s = this.state, t = s.tileExport, g = this.tileGeom();
-    const tiles = {};
+    const tiles = Object.create(null);
     s.tiles.forEach((tl,i) => {
       const key = tl.name.toLowerCase().replace(/\s+/g,'_');
       const entry = { index:i, kind: tl.kind || 'ground' };
@@ -1784,14 +1837,7 @@ class Component extends React.Component {
       tiles
     };
   }
-  exportTileMeta(){
-    const meta = this.tileMeta();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(meta, null, 2)], {type:'application/json'}));
-    a.download = (this.state.projectName||'tileset') + '-tileset.json';
-    document.body.appendChild(a); a.click(); a.remove();
-    this.setState({ hint:'Exported tile set metadata' });
-  }
+  exportTileMeta(){ this.downloadMetadata('tiles'); }
   paintTileRepeat(){
     const cv = this.previewRef.current;
     if (!cv) return;
@@ -1840,7 +1886,7 @@ class Component extends React.Component {
       const it = atlas[s.activeAtlas];
       const w = it ? it.w : 16, h = it ? it.h : 16;
       const at = atlas.length ? s.activeAtlas+1 : 0;
-      atlas.splice(at, 0, { id:'a'+Date.now(), name:'sprite_'+(atlas.length+1), w, h, px:new Array(w*h).fill(null) });
+      atlas.splice(at, 0, { id:assetId('sprite'), name:'sprite_'+(atlas.length+1), w, h, px:new Array(w*h).fill(null) });
       return { atlas, activeAtlas:at, workspace:'atlas', hint:'New sprite ('+w+'×'+h+') — set its size in the toolbar' };
     }, () => { this.fit(); this.markDirty(); });
   }
@@ -1849,7 +1895,7 @@ class Component extends React.Component {
       const i = at == null ? s.activeAtlas : at;
       const src = s.atlas[i]; if (!src) return null;
       const atlas = s.atlas.slice();
-      atlas.splice(i+1, 0, { id:'a'+Date.now(), name:src.name+' copy', w:src.w, h:src.h, px:src.px.slice() });
+      atlas.splice(i+1, 0, { id:assetId('sprite'), name:src.name+' copy', metadata:src.metadata?JSON.parse(JSON.stringify(src.metadata)):undefined, kind:src.kind, collision:src.collision, tags:src.tags, w:src.w, h:src.h, px:src.px.slice() });
       return { atlas, activeAtlas:i+1, hint:'Duplicated '+src.name };
     }, () => this.markDirty());
   }
@@ -1904,9 +1950,9 @@ class Component extends React.Component {
     this.dl(cv, (s.projectName||'atlas') + '-atlas.png');
     this.setState({ hint:'Exported atlas ' + g.w + '×' + g.h });
   }
-  atlasMeta(){
+  legacyAtlasMeta(){
     const s = this.state, e = s.atlasExport, g = this.atlasGeom();
-    const sprites = {};
+    const sprites = Object.create(null);
     g.rects.forEach(r => {
       const a = s.atlas[r.i];
       const entry = { x:r.x, y:r.y, w:r.w, h:r.h, kind:a.kind || 'decor' };
@@ -1934,12 +1980,37 @@ class Component extends React.Component {
     const i = this.atlasSheetHit(e);
     if (i != null) this.setState({ activeAtlas:i });
   }
-  exportAtlasMeta(){
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(this.atlasMeta(), null, 2)], {type:'application/json'}));
-    a.download = (this.state.projectName||'atlas') + '-atlas.json';
-    document.body.appendChild(a); a.click(); a.remove();
-    this.setState({ hint:'Exported atlas metadata' });
+  exportAtlasMeta(){ this.downloadMetadata('atlas'); }
+  metadataDocument(type){
+    const s=this.state;
+    if(type==='tiles'){
+      const g=this.tileGeom(), t=s.tileExport;
+      return PixelStudioMetadata.build({type:'tileset',image:(s.projectName||'tileset')+'-tileset.png',width:g.w,height:g.h,
+        assets:s.tiles.map((a,i)=>({...a,rect:{x:t.padding+(i%g.c)*(s.tileW+t.spacing),y:t.padding+Math.floor(i/g.c)*(s.tileH+t.spacing),w:s.tileW,h:s.tileH}})),animations:this.animationSheets()});
+    }
+    const g=this.atlasGeom();
+    return PixelStudioMetadata.build({type:'atlas',image:(s.projectName||'atlas')+'-atlas.png',width:g.w,height:g.h,
+      assets:g.rects.map(r=>({...s.atlas[r.i],rect:{x:r.x,y:r.y,w:r.w,h:r.h}})),animations:this.animationSheets()});
+  }
+  downloadMetadata(type,legacy=false){
+    try{
+      const assets=type==='tiles'?this.state.tiles:this.state.atlas;
+      if(legacy)PixelStudioMetadata.assertLegacyNames(assets);
+      const data=legacy?(type==='tiles'?this.legacyTileMeta():this.legacyAtlasMeta()):this.metadataDocument(type);
+      const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+      a.href=url;a.download=this.state.projectName+'-'+(type==='tiles'?'tileset':'atlas')+(legacy?'-legacy':'')+'.json';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+      this.setState({hint:'Exported '+(legacy?'legacy':'v2')+' metadata'});
+    }catch(e){this.setState({hint:e.message});window.alert('Cannot export metadata: '+e.message);}
+  }
+  applyMetadata(metadata,bulk=false){
+    const s=this.state,key=s.workspace==='tiles'?'tiles':'atlas', active=key==='tiles'?s.activeTile:s.activeAtlas;
+    const targets=bulk?s[key].filter(a=>s.metadataSelection.includes(a.id)):[s[key][active]];
+    const errors=targets.flatMap(a=>PixelStudioMetadata.validate(metadata,key==='tiles'?s.tileW:a.w,key==='tiles'?s.tileH:a.h,s.animations.map(a=>a.id)).map(e=>a.name+': '+e));
+    if(errors.length)return errors.join(' ');
+    this.snap();
+    this.setState(v=>({[key]:v[key].map(a=>targets.some(t=>t.id===a.id)?{...a,metadata:JSON.parse(JSON.stringify(metadata)),kind:metadata.category==='decoration'?'decor':metadata.category,collision:metadata.collision.mode!=='none',tags:metadata.tags.join(', '),corners:metadata.terrain.corners}:a)}),()=>this.markDirty());
+    return '';
   }
 
   /* ── menus ── */
@@ -1974,7 +2045,7 @@ class Component extends React.Component {
       { label:'Save As…', note:'⇧⌘S', click:close(()=>this.saveProject(true)) },
       { label:'Import Image…', note:'', click:close(()=>this.fileRef.current && this.fileRef.current.click()) },
       { label:'Paste sprite code…', note:'', click:close(()=>this.setState({ pasteOpen:true, pasteMsg:'' })) },
-      { label:'Export PNG', note:'', click:close(()=>this.exportPng()) },
+      { label:'Export selected PNG', note:s.pngScale+'×', click:close(()=>this.exportPng()) },
       { label:'Export Sprite Sheet…', note:'', click:close(()=>this.setState({sheetOpen:true})) },
       { label:'Export Tile Set…', note:'', click:close(()=>this.setState({tileSheetOpen:true})) },
       { label:'Export Atlas…', note:'', click:close(()=>this.setState({atlasSheetOpen:true})) }
@@ -2195,7 +2266,7 @@ class Component extends React.Component {
       exportAtlasMeta: () => this.exportAtlasMeta(),
       atlasMetaNames: (() => {
         if (!s.atlasSheetOpen) return [];
-        const m = this.atlasMeta();
+        const m = this.legacyAtlasMeta();
         return Object.keys(m.sprites).map(k => {
           const e = m.sprites[k];
           let l = '"' + k + '": { x:' + e.x + ', y:' + e.y + ', w:' + e.w + ', h:' + e.h + ', ' + e.kind;
@@ -2238,7 +2309,7 @@ class Component extends React.Component {
       exportTileSet: () => this.exportTileSet(),
       exportTileMeta: () => this.exportTileMeta(),
       tileMetaNames: (() => {
-        const m = this.tileMeta();
+        const m = this.legacyTileMeta();
         const lines = [{ line:'"terrains": [' + m.terrains.join(', ') + ']' }];
         Object.keys(m.tiles).forEach(k => {
           const e = m.tiles[k];
@@ -2254,7 +2325,7 @@ class Component extends React.Component {
       inspName: t ? t.name : '—',
       inspKind: t ? (t.kind || 'ground') : 'ground',
       inspKinds: TILE_KINDS.map(k => ({ id:k, label:k.charAt(0).toUpperCase()+k.slice(1), on: t && (t.kind||'ground')===k, pick:()=>this.setTileField({kind:k}) })),
-      inspIsTerrain: !!(t && (t.kind||'ground')==='terrain'),
+      inspIsTerrain: !!(t && PixelStudioMetadata.metadata(t).category==='terrain'),
       cornerLabelText: cornerLabel(t && t.corners),
       cornerCells: [['Top-left',0],['Top-right',1],['Bottom-left',3],['Bottom-right',2]].map(([pos,ci]) => ({
         pos, ci,
@@ -2360,6 +2431,20 @@ class Component extends React.Component {
       openImport: () => this.fileRef.current && this.fileRef.current.click(),
       onImport: e => this.onImport(e),
       exportPng: () => this.exportPng(),
+      pngLabel: this.pngTarget() ? 'Export '+this.pngTarget().name+' PNG' : 'Select an asset for PNG',
+      pngScale:s.pngScale,
+      setPngScale:e=>this.setState({pngScale:Number(e.target.value)}),
+      metadataAsset:s.workspace==='tiles'?s.tiles[s.activeTile]:s.workspace==='atlas'?s.atlas[s.activeAtlas]:null,
+      metadataWidth:D.w, metadataHeight:D.h,
+      metadataAnimations:s.animations,
+      metadataSelectedCount:(s.workspace==='tiles'?s.tiles:s.atlas).filter(a=>s.metadataSelection.includes(a.id)).length,
+      applyMetadata:m=>this.applyMetadata(m),
+      bulkMetadata:m=>this.applyMetadata(m,true),
+      metadataSelection:s.metadataSelection,
+      toggleMetadataSelection:(id,checked)=>this.setState(v=>({metadataSelection:checked?[...new Set(v.metadataSelection.concat(id))]:v.metadataSelection.filter(i=>i!==id)})),
+      metadataPreview:(()=>{if(!s.tileSheetOpen&&!s.atlasSheetOpen)return '';try{return JSON.stringify(this.metadataDocument(s.tileSheetOpen?'tiles':'atlas'),null,2);}catch(e){return 'Validation: '+e.message;}})(),
+      legacyMetadata:()=>this.downloadMetadata(s.tileSheetOpen?'tiles':'atlas',true),
+
       fileRef: this.fileRef,
 
       mainCursor: s.refMove ? 'move' : 'crosshair',
@@ -2714,6 +2799,10 @@ class Component extends React.Component {
               </div>
 </SidebarSection>
 
+            {R.metadataAsset && <SidebarSection title="Asset metadata">
+              <MetadataEditor key={R.metadataAsset.id} asset={R.metadataAsset} width={R.metadataWidth} height={R.metadataHeight} animations={R.metadataAnimations} apply={R.applyMetadata} bulk={R.bulkMetadata} selectedCount={R.metadataSelectedCount}/>
+              <small>Select card checkboxes to apply metadata to several assets.</small>
+            </SidebarSection>}
             <SidebarSection title="Recent">
 
               <div style={css("display:grid;grid-template-columns:repeat(12,1fr);gap:3px")}>
@@ -2999,6 +3088,7 @@ class Component extends React.Component {
                     <span style={css("font-size:10px;letter-spacing:.06em;color:var(--fg);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap")}>{fr.label}</span>
                     <div style={css("display:flex;align-items:center;gap:5px;flex:none")}>
                       <Hov onClick={fr.menu} title="More options" s="width:15px;height:15px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;color:var(--dim);cursor:pointer;padding:0;font-size:12px;line-height:1" sh="color:var(--gold)">⋯</Hov>
+                      {!fr.isFrame && <input type="checkbox" aria-label={'Select '+fr.label+' for metadata'} checked={R.metadataSelection.includes((R.isTiles?this.state.tiles:this.state.atlas)[i].id)} onClick={R.stop} onChange={e=>R.toggleMetadataSelection((R.isTiles?this.state.tiles:this.state.atlas)[i].id,e.target.checked)} />}
                       {fr.isFrame && (
                         <input type="checkbox" checked={fr.sel} onChange={fr.toggleSel} onClick={R.stop} title="Include in sprite sheet" style={css("width:12px;height:12px;accent-color:var(--gold);cursor:pointer;margin:0")} />
                       )}
@@ -3075,11 +3165,13 @@ class Component extends React.Component {
                   ))}
                 </div>
                 <div style={css("margin-left:auto;display:flex;align-items:center;gap:9px;flex:none")}>
-                  <Hov onClick={R.exportPng} title="Export just the active frame / tile / sprite as a PNG" s="display:flex;align-items:center;gap:6px;padding:7px 11px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:11.5px;color:var(--dim)" sh="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="14" height="14" viewBox="0 0 24 24" className="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Current → PNG</Hov>
+                  <label style={css("font-size:11px;color:var(--dim)")}>PNG scale <select aria-label="PNG scale" value={R.pngScale} onChange={R.setPngScale} style={css("background:var(--bg2);color:var(--fg)")}>{[1,2,4,8].map(n=><option key={n} value={n}>{n}×</option>)}</select></label>
+                  <Hov onClick={R.exportPng} title="Export just the active frame / tile / sprite as a PNG" s="display:flex;align-items:center;gap:6px;padding:7px 11px;background:transparent;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:11.5px;color:var(--dim)" sh="color:var(--fg);border-color:rgba(236,231,222,.3)"><svg width="14" height="14" viewBox="0 0 24 24" className="ic"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>{R.pngLabel}</Hov>
                   <Hov onClick={R.closeExport} s="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);cursor:pointer" sh="color:var(--fg)"><svg width="15" height="15" viewBox="0 0 24 24" className="ic"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></Hov>
                 </div>
               </div>
 
+              {R.exportTab!=='sheet' && <details style={css("padding:10px 20px;border-bottom:1px solid var(--line)")}><summary>JSON v2 preview &amp; legacy export</summary><pre style={css("max-height:220px;overflow:auto;font-size:11px;white-space:pre-wrap")}>{R.metadataPreview}</pre><button onClick={R.legacyMetadata} className="btn">Export legacy JSON</button></details>}
               {R.exportTab==='sheet' && (
               <div style={css("display:grid;grid-template-columns:1fr 292px")}>
                 <div style={css("padding:20px;border-right:1px solid var(--line);min-width:0")}>
@@ -3210,16 +3302,6 @@ class Component extends React.Component {
                       <Hov onClick={R.addTerrain} title="Add terrain to the reusable list" s="display:flex;align-items:center;padding:4px 9px;background:transparent;border:1px dashed var(--line);border-radius:3px;color:var(--dim);font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer" sh="color:var(--gold);border-color:var(--gold)">Add new</Hov>
                     </div>
 
-                    <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px")}>Kind</div>
-                    <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-bottom:15px")}>
-                      {R.inspKinds.map((k,i)=>(
-                        <Hov key={i} onClick={k.pick} s="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                          {k.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                          <span style={css("position:relative")}>{k.label}</span>
-                        </Hov>
-                      ))}
-                    </div>
-
                     {R.inspIsTerrain ? (
                       <div style={css("margin-bottom:15px")}>
                         <div style={css("display:flex;align-items:center;justify-content:space-between;margin-bottom:8px")}>
@@ -3251,18 +3333,10 @@ class Component extends React.Component {
                         </div>
                       </div>
                     ) : (
-                      <div style={css("margin-bottom:15px;font-size:10.5px;color:var(--dim);font-style:italic")}>Corners apply to Terrain tiles — set Kind to “Terrain” to assign a terrain to each corner.</div>
+                      <div style={css("margin-bottom:15px;font-size:10.5px;color:var(--dim);font-style:italic")}>Corners apply to Terrain tiles — set Category to “terrain” in the Asset metadata panel to assign a terrain to each corner.</div>
                     )}
 
-                    <div style={css("display:flex;align-items:center;gap:16px")}>
-                      <label style={css("display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);cursor:pointer;flex:none")}>
-                        <input type="checkbox" checked={R.inspCollision} onChange={R.setInspCollision} style={css("width:14px;height:14px;accent-color:var(--gold);margin:0")} />Collision
-                      </label>
-                      <div style={css("flex:1;min-width:0;display:flex;align-items:center;gap:8px")}>
-                        <span style={css("font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);white-space:nowrap")}>Tags</span>
-                        <input value={R.inspTags} onChange={R.setInspTags} placeholder="comma, separated" style={css("flex:1;min-width:0;background:transparent;border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--fg);font-size:11.5px;outline:none")} />
-                      </div>
-                    </div>
+
                   </div>
                 </div>
                 <div style={css("padding:20px;display:flex;flex-direction:column;gap:16px")}>
@@ -3307,7 +3381,7 @@ class Component extends React.Component {
                   <div style={css("border:1px solid var(--line);border-radius:4px;padding:10px 11px")}>
                     <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>tileset.json</div>
                     <div style={css("font-size:10.5px;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.6")}>
-                      {R.tileMetaNames.map((mn,i)=>(<div key={i}>{mn.line}</div>))}
+                      JSON v2 preserves names with stable IDs. Open the preview above to inspect JSON or export the legacy format.
                     </div>
                   </div>
                   <div style={css("display:flex;flex-direction:column;gap:7px;margin-top:auto")}>
@@ -3344,25 +3418,8 @@ class Component extends React.Component {
                             <CommitInput value={R.atlasItemH} commit={R.setAtlasItemH} title="Sprite height" style={css("width:48px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--fg);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;padding:5px 4px;outline:none")} />
                             <span style={css("font-size:11px;color:var(--dim)")}>px</span>
                           </div>
-                          <label style={css("display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);cursor:pointer")}>
-                            <input type="checkbox" checked={R.atlasItemCollision} onChange={R.setAtlasItemCollision} style={css("width:14px;height:14px;accent-color:var(--gold);margin:0")} />Collision
-                          </label>
                         </div>
-                        <div>
-                          <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px")}>Kind</div>
-                          <div style={css("display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden")}>
-                            {R.atlasKinds.map((k,i)=>(
-                              <Hov key={i} onClick={k.pick} s="position:relative;flex:1;padding:6px 0;background:transparent;border:0;border-left:1px solid var(--line);font-size:11px;color:var(--dim);cursor:pointer" sh="color:var(--fg)">
-                                {k.on && <span style={css("position:absolute;inset:0;background:rgba(225,173,102,.14);box-shadow:inset 0 0 0 1px var(--gold)")}></span>}
-                                <span style={css("position:relative")}>{k.label}</span>
-                              </Hov>
-                            ))}
-                          </div>
-                        </div>
-                        <div style={css("display:flex;align-items:center;gap:8px")}>
-                          <span style={css("font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);white-space:nowrap")}>Tags</span>
-                          <input value={R.atlasItemTags} onChange={R.setAtlasItemTags} placeholder="comma, separated" style={css("flex:1;min-width:0;background:transparent;border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--fg);font-size:11.5px;outline:none")} />
-                        </div>
+                        <div style={css("font-size:11px;color:var(--dim)")}>Edit metadata in the right-sidebar Asset metadata panel before export.</div>
                       </div>
                     ) : (
                       <div style={css("font-size:10.5px;color:var(--dim);font-style:italic")}>No sprites to inspect.</div>
@@ -3400,7 +3457,7 @@ class Component extends React.Component {
                   <div style={css("border:1px solid var(--line);border-radius:4px;padding:10px 11px;max-height:180px;overflow:auto")}>
                     <div style={css("font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px")}>atlas.json</div>
                     <div style={css("font-size:10.5px;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.6")}>
-                      {R.atlasMetaNames.map((mn,i)=>(<div key={i}>{mn.line}</div>))}
+                      JSON v2 preserves names with stable IDs. Open the preview above to inspect JSON or export the legacy format.
                     </div>
                   </div>
                   <div style={css("display:flex;flex-direction:column;gap:7px;margin-top:auto")}>
