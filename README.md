@@ -19,3 +19,5 @@ as a file) so its local preview-sizing script can load:
 ```sh
 python3 -m http.server 8000
 ```
+
+See [Asset export](EXPORT-FORMAT.md) for selected PNG export, metadata editing, JSON v2, and legacy export compatibility.

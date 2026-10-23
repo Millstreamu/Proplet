@@ -11,7 +11,7 @@ function editor() {
   class State {
     setState(update, done) { Object.assign(this.state, typeof update === 'function' ? update(this.state) : update); if (done) done(); }
   }
-  const ctx = {clearTimeout, React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js')};
+  const ctx = {clearTimeout, React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js'), PixelStudioMetadata:require('../metadata-model.js')};
   vm.runInNewContext(compiled, ctx);
   const app = new ctx.Editor({});
   app.fit = () => {};
@@ -48,7 +48,7 @@ test('independent dimensions round-trip and old projects use animation dimension
   assert.equal(app.state.w,48);
   assert.equal(app.state.tileW,16);
   assert.equal(app.state.tileH,24);
-  assert.equal(app.tileMeta().tileWidth,16);
+  assert.equal(app.legacyTileMeta().tileWidth,16);
   app.addTile();
   assert.equal(app.curPx().length,384);
   app.clearCurrent();
@@ -114,4 +114,46 @@ test('all sheets and single-sheet projects round-trip without losing inactive an
   app.addAnimation('New');
   app.selectAnimation('animation-1');
   assert.equal(app.state.frames[0].dur,80);
+});
+
+test('asset metadata survives project saves and duplicate assets receive separate IDs',()=>{
+  const app=editor();app.addAtlasItem();
+  app.applyMetadata(require('../metadata-model.js').metadata({kind:'decor',collision:true}));
+  const saved=JSON.parse(JSON.stringify(app.serialize()));
+  app.loadProject(saved,true);
+  assert.equal(app.state.atlas[0].metadata.collision.mode,'solid');
+  app.dupAtlasItem(0);
+  assert.notEqual(app.state.atlas[0].id,app.state.atlas[1].id);
+  app.state.atlas[1].metadata.collision.mode='trigger';
+  assert.equal(app.state.atlas[0].metadata.collision.mode,'solid');
+});
+test('bulk metadata validates every selected size before changing any asset',()=>{
+  const app=editor();app.addAtlasItem();app.addAtlasItem();
+  app.state.atlas[1].w=4;app.state.atlas[1].h=4;
+  app.state.metadataSelection=app.state.atlas.map(a=>a.id);
+  const m=require('../metadata-model.js').metadata({});
+  m.collision={mode:'solid',shape:{type:'rectangle',x:0,y:0,w:8,h:8}};
+  assert.match(app.applyMetadata(m,true),/must fit/);
+  assert.ok(app.state.atlas.every(a=>!a.metadata));
+  m.collision.shape={type:'bounds'};
+  assert.equal(app.applyMetadata(m,true),'');
+  assert.ok(app.state.atlas.every(a=>a.metadata.collision.mode==='solid'));
+});
+test('PNG target follows the highlighted workspace asset and explicit export tab',()=>{
+  const app=editor();
+  assert.equal(app.state.pngScale,1);
+  app.addAtlasItem();app.setAtlasDims(0,12,18);
+  app.curPx()[0]='#ff0000';
+  assert.equal(app.pngTarget().w,12);
+  assert.equal(app.pngTarget().h,18);
+  assert.equal(app.pngTarget().px[0],'#ff0000');
+  app.state.workspace='tiles';
+  assert.equal(app.pngTarget().name,app.state.tiles[app.state.activeTile].name);
+  assert.equal(app.pngTarget().w,app.state.tileW);
+  app.state.atlasSheetOpen=true;
+  assert.equal(app.pngTarget().w,12);
+  app.state.atlasSheetOpen=false;app.state.workspace='frames';
+  assert.equal(app.pngTarget().px,app.state.frames[app.state.active].px);
+  app.state.workspace='atlas';app.state.atlas=[];
+  assert.equal(app.pngTarget(),null);
 });
