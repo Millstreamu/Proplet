@@ -132,6 +132,7 @@ test('bulk metadata validates every selected size before changing any asset',()=
   app.state.atlas[1].w=4;app.state.atlas[1].h=4;
   app.state.metadataSelection=app.state.atlas.map(a=>a.id);
   const m=require('../metadata-model.js').metadata({});
+  m.enabled.collision=true;
   m.collision={mode:'solid',shape:{type:'rectangle',x:0,y:0,w:8,h:8}};
   assert.match(app.applyMetadata(m,true),/must fit/);
   assert.ok(app.state.atlas.every(a=>!a.metadata));
@@ -156,4 +157,17 @@ test('PNG target follows the highlighted workspace asset and explicit export tab
   assert.equal(app.pngTarget().px,app.state.frames[app.state.active].px);
   app.state.workspace='atlas';app.state.atlas=[];
   assert.equal(app.pngTarget(),null);
+});
+test('metadata export inspectors target their own asset even when Frames workspace is active',()=>{
+  const app=editor();app.addAtlasItem();app.state.workspace='frames';
+  const m=require('../metadata-model.js').metadata({kind:'decor'});
+  m.category='Potion ingredient';
+  app.state.metadataCategories.push(m.category);
+  assert.equal(app.applyMetadata(m,false,'tiles'),'');
+  assert.equal(app.state.tiles[0].metadata.category,'Potion ingredient');
+  assert.equal(app.state.atlas[0].metadata,undefined);
+  const saved=JSON.parse(JSON.stringify(app.serialize()));
+  app.loadProject(saved,true);
+  assert.ok(app.state.metadataCategories.includes('Potion ingredient'));
+  assert.equal(app.state.tiles[0].metadata.enabled.collision,false);
 });

@@ -18,6 +18,7 @@ test('v2 preserves duplicate names with stable IDs; legacy export rejects destru
 });
 test('validates placement, collision geometry, custom data and linked animation references',()=>{
   const m=metadata({});assert.deepEqual(validate(m,16,24),[]);
+  m.enabled={category:true,placement:true,collision:true,properties:true,animationId:true};
   m.pivot.x=2;m.collision={mode:'solid',shape:{type:'rectangle',x:12,y:0,w:10,h:4}};
   m.properties={bad:{nested:true}};m.animationId='missing';
   assert.equal(validate(m,16,24).length,4);
@@ -37,4 +38,19 @@ test('linked animations include real frame pixels, timing and clip ranges',()=>{
 test('invalid linked animation buffers and ranges prevent broken references from exporting',()=>{
   const a=asset('tree','Tree');a.metadata={animationId:'bad'};
   assert.throws(()=>build({assets:[a],animations:[{id:'bad',name:'Bad',w:2,h:2,frames:[{id:'f',px:[],dur:0}],tags:[{start:1,end:5}]}]}),/Invalid animation frames/);
+});
+test('disabled optional fields are omitted and do not validate inactive values',()=>{
+  const a=asset('one','Blank asset');
+  a.metadata={enabled:{category:false,collision:false,placement:false,tags:false,properties:false,terrain:false,animationId:false},collision:{mode:'invalid'},pivot:{x:100,y:100},properties:{invalid:{}},animationId:'missing'};
+  const doc=build({assets:[a]});
+  assert.deepEqual(Object.keys(doc.assets[0]),['id','name','rect']);
+  assert.deepEqual(doc.animations,[]);
+});
+test('blank category and empty optional values are not exported; enabled values remain',()=>{
+  const a=asset('one','Custom');
+  a.metadata={category:'',enabled:{category:true,tags:true,properties:true,animationId:true},tags:[],properties:{},animationId:null};
+  assert.deepEqual(Object.keys(build({assets:[a]}).assets[0]),['id','name','rect']);
+  a.metadata.category='Potion ingredient';a.metadata.properties={rarity:'rare'};
+  const entry=build({assets:[a]}).assets[0];
+  assert.equal(entry.category,'Potion ingredient');assert.equal(entry.properties.rarity,'rare');
 });

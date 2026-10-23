@@ -4,9 +4,13 @@ PNG export uses the selected frame, tile, or Atlas sprite. Inside the export dia
 
 ## Asset inspector
 
-Select a tile or Atlas sprite and expand **Asset metadata** in the right sidebar. Category describes the asset; collision is independent. For example, a decoration may be solid, a trigger, or non-colliding. Start from a preset or supply a custom category.
+Open the tile or Atlas export window and select the asset in its preview. Its metadata controls are in the export inspector, alongside the existing sprite and tile information. Category describes the asset; collision is independent. For example, a decoration may be solid, a trigger, or non-colliding. Start from a preset or supply a custom category.
 
-Fields are drafts until **Apply metadata** succeeds. Invalid drafts display an error and do not replace the last applied values. Export uses applied metadata. Select checkboxes on asset cards and use **Apply to selected assets** to copy the inspector's metadata to those assets. The whole operation is rejected if any target's dimensions make the metadata invalid. Pixel artwork, dimensions, IDs, and names are never copied by this operation.
+Optional sections each have an **Include** checkbox. Unchecked sections are left out of JSON v2, not filled with placeholder values. Their settings remain in the project for later reuse. Blank categories and animation links, empty tags and properties, and null placement values are omitted. Identity, name, and image rectangle are always exported. Old projects with existing metadata keep their previously meaningful fields enabled.
+
+Use the Category dropdown to reuse a category, or enter a name and choose **Add category**. Custom categories are saved with the project and are shared by tile and Atlas inspectors. **Not specified** leaves category out of JSON v2.
+
+Fields are drafts until **Apply metadata** succeeds. Invalid drafts display an error and do not replace the last applied values. Export uses applied metadata. Select checkboxes on asset cards and use **Apply to selected assets** to copy the inspector's metadata to those assets. The whole operation is rejected if any target's dimensions make enabled metadata invalid. Disabled sections are neither parsed nor validated. Pixel artwork, dimensions, IDs, and names are never copied by this operation.
 
 Advanced fields accept JSON:
 
@@ -60,4 +64,4 @@ Linked animations contain `id`, `name`, `w`, `h`, `frames` (`id`, `durationMs`, 
 
 Existing project metadata is migrated on inspection/export without losing the original fields: `decor` becomes category `decoration`; legacy `collision` kind enables solid collision; `animated` becomes category `prop` without inventing animation frames. Old tags and terrain corners remain available. Applied metadata is stored in project files.
 
-**JSON v2 preview & legacy export** in the export dialog offers the previous JSON structure. Legacy export is intentionally lossy for new fields (geometry, placement, custom properties, and animation links). It retains kind, collision boolean, tags, and terrain corners. Normalized duplicate names block legacy export instead of silently discarding assets. Use v2 for new importers; keep legacy mode for existing consumers.
+**JSON v2 preview & legacy export** in the export dialog offers the previous JSON structure. Legacy export is intentionally lossy for new fields (geometry, placement, custom properties, and animation links). It retains kind, collision boolean, tags, and terrain corners; its original format cannot represent every v2 inclusion choice. Normalized duplicate names block legacy export instead of silently discarding assets. Use v2 for new importers; keep legacy mode for existing consumers.
