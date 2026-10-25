@@ -11,7 +11,7 @@ function editor() {
   class State {
     setState(update, done) { Object.assign(this.state, typeof update === 'function' ? update(this.state) : update); if (done) done(); }
   }
-  const ctx = {clearTimeout, React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js'), PixelStudioMetadata:require('../metadata-model.js')};
+  const ctx = {clearTimeout, PixelStudioScaling:require('../scaling-model.js'), React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js'), PixelStudioMetadata:require('../metadata-model.js')};
   vm.runInNewContext(compiled, ctx);
   const app = new ctx.Editor({});
   app.fit = () => {};
@@ -180,4 +180,21 @@ test('Atlas and tileset export previews accept array tags from imported projects
   assert.deepEqual(Array.from(Object.values(legacy.sprites)[0].tags),['forest','tree']);
   assert.deepEqual(Array.from(Object.values(app.legacyTileMeta().tiles)[0].tags),['ground','grass']);
   assert.deepEqual(Array.from(app.metadataDocument('atlas').assets[0].tags),['forest','tree']);
+});
+test('trial artwork scaling isolates workspaces and can be undone',()=>{
+ const app=editor();const tiles=JSON.stringify(app.state.tiles);const frames=JSON.stringify(app.state.frames);
+ app.scaleCurrent(200);assert.equal(app.state.w,64);assert.equal(JSON.stringify(app.state.tiles),tiles);
+ app.undo();assert.equal(app.state.w,32);assert.equal(JSON.stringify(app.state.frames),frames);
+ app.addAtlasItem();app.addAtlasItem();app.scaleCurrent(200);
+ assert.equal(app.state.atlas[0].w,16);assert.equal(app.state.atlas[1].w,32);
+ app.undo();assert.equal(app.state.atlas[1].w,16);
+});
+test('hue shift affects all active animation frames or only the highlighted Atlas sprite and supports undo',()=>{
+ const app=editor();app.state.frames[0].px[0]='#ff0000';
+ const tiles=JSON.stringify(app.state.tiles);app.shiftArtworkHue(120);
+ assert.equal(app.state.frames[0].px[0],'#00ff00');assert.equal(JSON.stringify(app.state.tiles),tiles);
+ app.undo();assert.equal(app.state.frames[0].px[0],'#ff0000');
+ app.addAtlasItem();app.addAtlasItem();app.state.atlas[0].px[0]='#ff0000';app.state.atlas[1].px[0]='#ff0000';
+ app.shiftArtworkHue(-120);assert.equal(app.state.atlas[0].px[0],'#ff0000');assert.equal(app.state.atlas[1].px[0],'#0000ff');
+ app.undo();assert.equal(app.state.atlas[1].px[0],'#ff0000');
 });

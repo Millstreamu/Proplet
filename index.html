@@ -42,6 +42,7 @@ input{font-family:inherit}
 <script src="line-model.js"></script>
 <script src="paint-model.js"></script>
 <script src="metadata-model.js"></script>
+<script src="scaling-model.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -278,7 +279,7 @@ class Component extends React.Component {
         { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
       ],
       activeTag:'t2', tagEdit:null,
-      pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
+      scalePercent:50, hueDegrees:0, pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
       tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
@@ -1866,6 +1867,33 @@ class Component extends React.Component {
   }
 
   /* ── atlas (free-size decor sprites, packed into one sheet) ── */
+  shiftArtworkHue(degrees=this.state.hueDegrees){
+    if(!Number.isFinite(degrees)||degrees%360===0)return;
+    const s=this.state,key=s.workspace==='atlas'?'atlas':s.workspace==='tiles'?'tiles':'frames';
+    if(key==='atlas'&&!s.atlas.length)return;
+    let items;
+    try{items=s[key].map((item,i)=>key==='atlas'&&i!==s.activeAtlas?item:{...item,px:PixelStudioScaling.huePixels(item.px,degrees)});}
+    catch(e){this.setState({hint:e.message});return;}
+    this.commitFloatingSelection();clearTimeout(this.timer);this.snap();
+    this.setState({[key]:items,playing:false,selRect:null,clip:null,
+      hint:'Shifted artwork hue by '+degrees+'° — Undo to revert'},()=>this.markDirty());
+  }
+  scaleCurrent(percent=this.state.scalePercent){
+    const d=this.dims(),nw=Math.round(d.w*percent/100),nh=Math.round(d.h*percent/100),ws=this.state.workspace;
+    if(!Number.isFinite(percent)||percent<=0||nw<1||nh<1||nw>256||nh>256){this.setState({hint:'Choose a scale resulting in dimensions between 1 and 256 pixels.'});return;}
+    if(ws==='atlas'&&!this.state.atlas.length)return;
+    if(nw===d.w&&nh===d.h)return;
+    const key=ws==='atlas'?'atlas':ws==='tiles'?'tiles':'frames';
+    let items;
+    try{items=this.state[key].map((item,i)=>{
+      if(ws==='atlas'&&i!==this.state.activeAtlas)return item;
+      const scaled=PixelStudioScaling.asset(item,d.w,d.h,nw,nh);
+      return ws==='atlas'?{...scaled,w:nw,h:nh}:scaled;
+    });}catch(e){this.setState({hint:e.message});return;}
+    this.commitFloatingSelection();clearTimeout(this.timer);this.snap();
+    this.setState({[key]:items,...(ws==='atlas'?{}:ws==='tiles'?{tileW:nw,tileH:nh}:{w:nw,h:nh}),playing:false,selRect:null,clip:null,
+      hint:'Scaled artwork to '+nw+' × '+nh+' — Undo to revert'},()=>{this.fit();this.markDirty();});
+  }
   resizeCurrent(nw, nh){
     if (this.state.workspace === 'atlas') this.setAtlasDims(this.state.activeAtlas, nw, nh);
     else this.setDims(nw, nh);
@@ -2794,6 +2822,20 @@ class Component extends React.Component {
                 Width × height
                 <CommitInput aria-label="Canvas dimensions" value={R.dimsText} commit={R.setDimsText} title={R.dimsTitle} style={css("width:85px;background:var(--bg2);border:1px solid var(--line);border-radius:4px;color:var(--fg);padding:6px;font-size:12px;text-align:center")} />
               </label>
+              <div style={css("border-top:1px solid var(--line);padding-top:10px;margin-bottom:12px")}>
+                <div style={css("font-size:11px;color:var(--gold);margin-bottom:6px")}>Scale artwork · trial</div>
+                <div style={css("font-size:10px;color:var(--dim);margin-bottom:6px")}>{this.state.workspace==='atlas'?'Selected sprite':this.state.workspace==='tiles'?'All tiles in this set':'All frames in this animation sheet'} · crisp pixels. Downscaling uses nearest pixels; fine details may be lost. Undo to compare.</div>
+                <div style={css("display:flex;gap:5px;margin-bottom:6px")}>{[25,50,75].map(percent=><button key={percent} className="btn" style={css("padding:4px 7px;font-size:11px")} onClick={()=>this.setState({scalePercent:percent})}>{percent}%</button>)}</div>
+                <label style={css("font-size:11px;display:flex;align-items:center;gap:6px")}><input aria-label="Artwork scale percent" type="number" min="1" step="1" value={this.state.scalePercent} onChange={e=>this.setState({scalePercent:Number(e.target.value)})} style={css("width:65px;background:var(--bg2);color:var(--fg);border:1px solid var(--line);padding:5px")}/> %
+                <button className="btn" onClick={()=>this.scaleCurrent()}>Scale artwork</button></label>
+                <div style={css("font-size:10px;color:var(--dim);margin-top:5px")}>Result: {Math.round(this.dims().w*this.state.scalePercent/100)} × {Math.round(this.dims().h*this.state.scalePercent/100)} px · limit 256 × 256</div>
+              </div>
+              <div style={css("border-top:1px solid var(--line);padding-top:10px;margin-bottom:12px")}>
+                <div style={css("font-size:11px;color:var(--gold);margin-bottom:6px")}>Hue shift artwork · trial</div>
+                <div style={css("font-size:10px;color:var(--dim);margin-bottom:6px")}>{this.state.workspace==='atlas'?'Selected sprite':this.state.workspace==='tiles'?'All tiles in this set':'All frames in this animation sheet'} · rotates colours; keeps shading and transparency.</div>
+                <label style={css("display:flex;gap:7px;align-items:center;font-size:11px")}><input aria-label="Artwork hue shift" type="range" min="-180" max="180" step="1" value={this.state.hueDegrees} onChange={e=>this.setState({hueDegrees:Number(e.target.value)})} style={css("min-width:0;width:100%;accent-color:var(--gold)")}/><output>{this.state.hueDegrees}°</output></label>
+                <button className="btn" onClick={()=>this.shiftArtworkHue()} disabled={!this.state.hueDegrees}>Apply hue shift</button>
+              </div>
               <div style={css("font-size:10px;color:var(--dim);margin-bottom:5px")} title="Canvas background (view only)">Background · view only</div>
               <div style={css("display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden")}>
                 {R.viewBackgrounds.map(bg=>(
