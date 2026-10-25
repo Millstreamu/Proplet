@@ -80,3 +80,8 @@ test('invalid terrain role and variation data are blocked while disabled terrain
   const m=metadata({metadata:{category:'terrain',terrain:{family:'grass',role:'base',corners:[],...patch}}});assert.ok(validate(m,16,16).length);m.enabled.terrain=false;assert.deepEqual(validate(m,16,16),[]);
  }
 });
+
+test('art exports omit legacy geometry even when the old project geometry is invalid',()=>{
+ const a=asset('art','Art');a.collision=true;a.metadata={pivot:{x:99,y:-1},collision:{mode:'solid',shape:{type:'polygon',points:[]}},enabled:{placement:true,collision:true}};
+ const d=build({type:'atlas',assets:[a]});assert.equal('collision' in d.assets[0],false);assert.equal('pivot' in d.assets[0],false);assert.deepEqual(d.coordinates,{rectangles:'pixels; top-left origin'});
+});

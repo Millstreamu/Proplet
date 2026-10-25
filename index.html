@@ -43,6 +43,7 @@ dialog::backdrop{background:rgba(0,0,0,.12)}
 <script src="line-model.js"></script>
 <script src="paint-model.js"></script>
 <script src="metadata-model.js"></script>
+<script src="atlas-model.js"></script>
 <script src="scaling-model.js"></script>
 </head>
 <body>
@@ -101,7 +102,7 @@ function SidebarSection({title, children}){
 }
 
 function MetadataEditor({asset, width, height, animations, apply, bulk, selectedCount, categories, addCategory}){
-  const [draft,setDraft]=React.useState(()=>PixelStudioMetadata.metadata(asset));
+  const [draft,setDraft]=React.useState(()=>{const m=PixelStudioMetadata.metadata(asset);return {...m,enabled:{...m.enabled,collision:false,placement:false}};});
   const [shape,setShape]=React.useState(()=>JSON.stringify(draft.collision.shape));
   const [properties,setProperties]=React.useState(()=>JSON.stringify(draft.properties));
   const [placement,setPlacement]=React.useState(()=>JSON.stringify({pivot:draft.pivot,groundAnchor:draft.groundAnchor,footprint:draft.footprint}));
@@ -125,8 +126,8 @@ function MetadataEditor({asset, width, height, animations, apply, bulk, selected
   return <div style={css('display:flex;flex-direction:column;gap:10px')}>
     <strong style={css('font-size:12px;color:var(--fg)')}>{asset.name}</strong>
     <small style={css('color:var(--dim);overflow-wrap:anywhere')}>ID: {asset.id}</small>
-    <label style={css('font-size:11px')}>Start from preset<select aria-label="Metadata preset" defaultValue="" onChange={e=>{const preset=PixelStudioMetadata.PRESETS[e.target.value];if(preset){setDraft({...draft,...preset,enabled:{...draft.enabled,category:true,collision:preset.collision.mode!=='none'}});setShape(JSON.stringify(preset.collision.shape));setMessage('Preset pending — Apply metadata to save.');}}} style={inputStyle}><option value="">Choose…</option>{Object.keys(PixelStudioMetadata.PRESETS).map(k=><option key={k}>{k}</option>)}</select></label>
-    {['category','collision','placement','tags','properties','terrain','animationId'].map(key=>{
+    <label style={css('font-size:11px')}>Start from preset<select aria-label="Metadata preset" defaultValue="" onChange={e=>{const preset=PixelStudioMetadata.PRESETS[e.target.value];if(preset){setDraft({...draft,...preset,enabled:{...draft.enabled,category:true,collision:false,placement:false}});setShape(JSON.stringify(preset.collision.shape));setMessage('Preset pending — Apply metadata to save.');}}} style={inputStyle}><option value="">Choose…</option>{Object.keys(PixelStudioMetadata.PRESETS).map(k=><option key={k}>{k}</option>)}</select></label>
+    {['category','tags','properties','terrain','animationId'].map(key=>{
       const names={category:'Category',collision:'Collision',placement:'Placement',tags:'Tags',properties:'Custom properties',terrain:'Terrain',animationId:'Linked animation'};
       return <div key={key} style={css('border-top:1px solid var(--line);padding-top:9px')}>
         <label style={css('display:flex;gap:8px;align-items:center;font-size:12px')}><input type="checkbox" checked={!!draft.enabled[key]} onChange={e=>{setDraft({...draft,enabled:{...draft.enabled,[key]:e.target.checked}});setMessage('Changes pending — Apply metadata to save.');}}/>Include {names[key]}</label>
@@ -135,8 +136,6 @@ function MetadataEditor({asset, width, height, animations, apply, bulk, selected
             <select aria-label="Category" value={draft.category} onChange={e=>{setDraft({...draft,category:e.target.value});setMessage('Changes pending — Apply metadata to save.');}} style={inputStyle}><option value="">Not specified</option>{[...new Set(categories.concat(draft.category).filter(Boolean))].map(c=><option key={c}>{c}</option>)}</select>
             <div style={css('display:flex;gap:6px')}><input aria-label="New category" placeholder="New category" value={newCategory} onChange={e=>setNewCategory(e.target.value)} style={inputStyle}/><button className="btn" style={{flex:'none',whiteSpace:'nowrap'}} onClick={()=>{const name=newCategory.trim();if(name){addCategory(name);setDraft({...draft,category:name});setNewCategory('');setMessage('Category added — Apply metadata to save.');}}}>Add category</button></div>
           </>}
-          {key==='collision'&&<><select aria-label="Collision mode" value={draft.collision.mode} onChange={e=>setDraft({...draft,collision:{...draft.collision,mode:e.target.value}})} style={inputStyle}>{['none','solid','trigger','one-way'].map(k=><option key={k}>{k}</option>)}</select>{field('Collision shape JSON',shape,setShape,'Bounds, rectangle, or polygon in local pixels.')}</>}
-          {key==='placement'&&field('Placement JSON',placement,setPlacement,'Pivot: normalized 0–1. Ground anchor: local pixels or null. Footprint: tile cells or null.')}
           {key==='tags'&&field('Tags',draft.tags.join(', '),v=>setDraft({...draft,tags:[...new Set(v.split(',').map(t=>t.trim()).filter(Boolean))]}))}
           {key==='properties'&&field('Custom properties JSON',properties,setProperties,'Example: {"damage":10,"interactable":true,"material":"wood"}')}
           {key==='terrain'&&<>
@@ -152,7 +151,7 @@ function MetadataEditor({asset, width, height, animations, apply, bulk, selected
         </div>}
       </div>;
     })}
-    <small style={css('color:var(--dim)')}>These fields describe intent; your game importer implements the behaviour.</small>
+    <small style={css('color:var(--dim)')}>Artwork metadata only. Set anchors and collision in your map editor.</small>
     {errors.length>0&&<div role="alert" style={css('color:#f09586;font-size:11px')}>{errors.join(' ')}</div>}
     <div role="status" style={css('font-size:11px;color:var(--gold)')}>{message}</div>
     <button onClick={()=>commit(false)} className="btn">Apply metadata</button>
@@ -242,8 +241,8 @@ function cornerLabel(cn){
 }
 
 const assetId = prefix => prefix+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);
-const TILE_KINDS = ['ground','terrain','decor','collision','animated'];
-const ATLAS_KINDS = ['decor','prop','ground','collision','animated'];
+const TILE_KINDS = ['ground','terrain','decor','animated'];
+const ATLAS_KINDS = ['decor','prop','animated'];
 
 /* Growing binary-tree rectangle packer — nests variably-sized sprites into one
    sheet like a texture atlas. Returns per-input {x,y} plus the sheet w/h. */
@@ -279,7 +278,7 @@ class Component extends React.Component {
     this.state = {
       w, h, frames:this.demoFrames(w,h), active:0, tool:'pencil',
       animations:[{id:'animation-1', name:'Potion swirl'}], activeAnimation:'animation-1',
-      projectName:'player_walk', named:false, dirty:false, savedAt:null,
+      projectId:PixelStudioAtlas.id('project'), projectName:'player_walk', named:false, dirty:false, savedAt:null,
       autoState:'idle', autoAt:null, restore:null, pending:null,
       workspace:'frames',
       tags:[
@@ -292,7 +291,7 @@ class Component extends React.Component {
       tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
-      atlas:[], activeAtlas:0, atlasExport:{ spacing:1, padding:1, transparent:true }, atlasSheetOpen:false,
+      atlasSheets:[{id:'atlas-1',name:'Atlas 1',assets:[]}],activeAtlasSheet:'atlas-1',atlasScope:'complete',atlas:[], activeAtlas:0, atlasExport:{ spacing:1, padding:1, transparent:true }, atlasSheetOpen:false,
       tileExport:{ layout:'grid', cols:4, spacing:0, padding:0, transparent:true },
       tileSheetOpen:false, newOpen:false, saveAs:null,
       pasteOpen:false, pasteText:'', pasteMsg:'',
@@ -839,7 +838,7 @@ class Component extends React.Component {
     this.redoStack = [];
     this.markDirty();
   }
-  cap(){ return { frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, tileW:this.state.tileW, tileH:this.state.tileH, selRect:this.state.selRect }; }
+  cap(){ return { atlasSheets:JSON.parse(JSON.stringify(this.atlasCollections())),activeAtlasSheet:this.state.activeAtlasSheet,atlasExport:{...this.state.atlasExport}, frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, tileW:this.state.tileW, tileH:this.state.tileH, selRect:this.state.selRect }; }
   undo(){ if (!this.undoStack.length) return; this.commitFloatingSelection(); this.redoStack.push(this.cap()); this.setState(this.undoStack.pop()); }
   redo(){ if (!this.redoStack.length) return; this.commitFloatingSelection(); this.undoStack.push(this.cap()); this.setState(this.redoStack.pop()); }
 
@@ -900,13 +899,13 @@ class Component extends React.Component {
   curPx(){
     const s = this.colourPreviewState();
     if (s.workspace === 'tiles'){ const t = s.tiles[s.activeTile]; return t ? t.px : s.frames[s.active].px; }
-    if (s.workspace === 'atlas'){ const a = s.atlas[s.activeAtlas]; return a ? a.px : s.frames[s.active].px; }
+    if (s.workspace === 'atlas'){ const a = s.atlas[s.activeAtlas]; return a ? a.px : new Array(256).fill(null); }
     return s.frames[s.active].px;
   }
   /* dimensions of the surface currently being edited (atlas sprites carry their own) */
   dims(){
     const s = this.state;
-    if (s.workspace === 'atlas'){ const a = s.atlas[s.activeAtlas]; if (a) return { w:a.w, h:a.h }; }
+    if (s.workspace === 'atlas'){ const a = s.atlas[s.activeAtlas]; return a ? { w:a.w, h:a.h } : {w:16,h:16}; }
     if (s.workspace === 'tiles') return { w:s.tileW, h:s.tileH };
     return { w:s.w, h:s.h };
   }
@@ -1517,7 +1516,7 @@ class Component extends React.Component {
   singleAnimationProject(){
     const project = this.serialize();
     const a = project.animations.find(a => a.id === project.activeAnimation);
-    return {...project, name:a.name, animations:[a], workspace:'frames', tiles:[], atlas:[], terrains:[]};
+    return {...project, name:a.name, animations:[a], workspace:'frames', tiles:[], atlas:[],atlasSheets:[],activeAtlasSheet:null, terrains:[]};
   }
   saveAnimation(){
     const project = this.singleAnimationProject();
@@ -1533,7 +1532,7 @@ class Component extends React.Component {
   serialize(){
     const s = this.state;
     return {
-      format:'pixelproj', version:1, name:s.projectName, w:s.w, h:s.h, metadataCategories:s.metadataCategories,
+      format:'pixelproj', version:1, projectId:s.projectId, name:s.projectName, w:s.w, h:s.h, metadataCategories:s.metadataCategories,
       animations:this.animationSheets(), activeAnimation:s.activeAnimation,
       frames:s.frames.map(f=>({ id:f.id, px:f.px, sel:f.sel, dur:f.dur })),
       tags:s.tags, activeTag:s.activeTag,
@@ -1544,12 +1543,14 @@ class Component extends React.Component {
       sheet:{ layout:s.layout, cols:s.cols, spacing:s.spacing, padding:s.padding, transparent:s.transparent, scope:s.exportScope },
       tiles:s.tiles.map(t=>({ id:t.id, name:t.name, px:t.px, kind:t.kind, corners:t.corners, collision:t.collision, tags:t.tags, metadata:t.metadata })),
       terrains:s.terrains,
+      atlasSheets:this.atlasCollections(),activeAtlasSheet:s.activeAtlasSheet,
       atlas:s.atlas.map(a=>({ id:a.id, name:a.name, w:a.w, h:a.h, px:a.px, kind:a.kind, collision:a.collision, tags:a.tags, metadata:a.metadata })), atlasExport:s.atlasExport, activeAtlas:s.activeAtlas,
       activeTile:s.activeTile, tileExport:s.tileExport, workspace:s.workspace
     };
   }
   loadProject(d, named){
     const project = d;
+    const atlasState=PixelStudioAtlas.normalize(project),atlasSheet=atlasState.atlasSheets.find(a=>a.id===atlasState.activeAtlasSheet);
     const animations = Array.isArray(d.animations) && d.animations.length ? d.animations :
       [{id:'animation-1', name:d.name || 'Animation 1', w:d.w || d.size || 32, h:d.h || d.size || 32,
         frames:d.frames, tags:d.tags || [], activeTag:d.activeTag || null, sheet:d.sheet}];
@@ -1579,9 +1580,9 @@ class Component extends React.Component {
       transparent: sh.transparent !== false, exportScope: sh.scope || 'all',
       tiles: (d.tiles && d.tiles.length) ? d.tiles : this.demoTiles(ts.w || w,ts.h || h),
       terrains: d.terrains || [], terrainDraft:'',
-      atlas: d.atlas || [],
-      activeAtlas: d.activeAtlas || 0,
-      atlasExport: d.atlasExport || { spacing:1, padding:1, transparent:true },
+      ...atlasState,atlas:atlasSheet.assets,atlasScope:'complete',
+      activeAtlas:atlasSheet.activeSprite||0,
+      atlasExport:atlasSheet.export,
       atlasSheetOpen:false,
       activeTile: d.activeTile || 0,
       tileExport: d.tileExport || { layout:'grid', cols:4, spacing:0, padding:0, transparent:true },
@@ -1628,7 +1629,7 @@ class Component extends React.Component {
       projectName:(s.npName||'untitled').trim() || 'untitled', named:false, dirty:true, savedAt:null,
       w:nw, h:nh, tileW:nw, tileH:nh, frames:[{ id:'f'+Date.now(), px:new Array(nw*nh).fill(null), sel:true, dur:120 }], active:0,
       tags:[], activeTag:null, tiles:[{ id:assetId('tile'), name:'Tile 1', px:new Array(nw*nh).fill(s.npTransparent ? null : s.bg) }],
-      atlas:[], activeAtlas:0, atlasSheetOpen:false,
+      projectId:PixelStudioAtlas.id('project'),atlasSheets:[{id:'atlas-1',name:'Atlas 1',assets:[]}],activeAtlasSheet:'atlas-1',atlasScope:'complete',atlas:[], activeAtlas:0, atlasSheetOpen:false,
       activeTile:0, workspace:'frames', selRect:null, clip:null, playing:false, newOpen:false,
       transparent:!!s.npTransparent, restore:null,
       hint:'New project — ' + nw + '×' + nh
@@ -1850,7 +1851,7 @@ class Component extends React.Component {
       const key = tl.name.toLowerCase().replace(/\s+/g,'_');
       const entry = { index:i, kind: tl.kind || 'ground' };
       if ((tl.kind === 'terrain') && tl.corners && tl.corners.length === 4 && tl.corners.every(Boolean)) entry.corners = tl.corners.slice();
-      if (tl.collision) entry.collision = true;
+      // Collision is authored in the receiving workshop.
       const tags = PixelStudioMetadata.tags(tl.tags);
       if (tags.length) entry.tags = tags;
       tiles[key] = entry;
@@ -1960,6 +1961,7 @@ class Component extends React.Component {
     }, () => this.fit());
   }
   addAtlasItem(){
+    this.snap();
     this.setState(s => {
       const atlas = s.atlas.slice();
       const it = atlas[s.activeAtlas];
@@ -1970,6 +1972,7 @@ class Component extends React.Component {
     }, () => { this.fit(); this.markDirty(); });
   }
   dupAtlasItem(at){
+    this.snap();
     this.setState(s => {
       const i = at == null ? s.activeAtlas : at;
       const src = s.atlas[i]; if (!src) return null;
@@ -1980,6 +1983,7 @@ class Component extends React.Component {
   }
   delAtlasItem(at){
     if (!this.state.atlas.length) return;
+    this.snap();
     this.setState(s => { const i = at == null ? s.activeAtlas : at; return { atlas:s.atlas.filter((_,j)=>j!==i), activeAtlas:Math.max(0, Math.min(s.atlas.length-2, i-1)) }; }, () => { this.fit(); this.markDirty(); });
   }
   renameAtlasItem(at){
@@ -1991,13 +1995,40 @@ class Component extends React.Component {
   }
   moveAtlasItem(from, to){
     if (to < 0 || to >= this.state.atlas.length || from === to) return;
+    this.snap();
     this.setState(s => { const atlas = s.atlas.slice(); const [m]=atlas.splice(from,1); atlas.splice(to,0,m); return { atlas, activeAtlas:to }; }, () => this.markDirty());
+  }
+  atlasCollections(){
+    const s=this.state;return (s.atlasSheets||[]).map(sheet=>sheet.id===s.activeAtlasSheet?{...sheet,assets:s.atlas,export:s.atlasExport,activeSprite:s.activeAtlas}:sheet);
+  }
+  selectAtlasSheet(id){
+    const sheets=this.atlasCollections(),sheet=sheets.find(s=>s.id===id);if(!sheet)return;
+    this.commitFloatingSelection();clearTimeout(this.timer);this.setState({playing:false,atlasSheets:sheets,activeAtlasSheet:id,atlas:sheet.assets,atlasExport:sheet.export||{spacing:1,padding:1,transparent:true},activeAtlas:sheet.activeSprite||0,atlasScope:'complete',metadataSelection:[],selRect:null,colourModify:null},()=>this.fit());
+  }
+  addAtlasSheet(name){
+    this.snap();const sheet={id:PixelStudioAtlas.id('atlas'),name:typeof name==='string'&&name.trim()?name.trim():'Atlas '+(this.state.atlasSheets.length+1),assets:[{id:PixelStudioAtlas.id('sprite'),name:'Sprite 1',w:16,h:16,px:Array(256).fill(null)}],export:{spacing:1,padding:1,transparent:true},activeSprite:0};
+    this.setState({atlasSheets:this.atlasCollections().concat(sheet)},()=>{this.selectAtlasSheet(sheet.id);this.markDirty();});
+  }
+  renameAtlasSheet(name){
+    const sheets=this.atlasCollections(),sheet=sheets.find(s=>s.id===this.state.activeAtlasSheet);
+    const next=typeof name==='string'?name:window.prompt('Atlas sheet name',sheet.name);if(!next?.trim())return;this.snap();sheet.name=next.trim();this.setState({atlasSheets:sheets},()=>this.markDirty());
+  }
+  duplicateAtlasSheet(){
+    this.snap();const sheet=PixelStudioAtlas.duplicate(this.atlasCollections().find(s=>s.id===this.state.activeAtlasSheet));this.setState({atlasSheets:this.atlasCollections().concat(sheet)},()=>{this.selectAtlasSheet(sheet.id);this.markDirty();});
+  }
+  removeAtlasSheet(){
+    if(this.state.atlasSheets.length<2)return;this.snap();const sheets=this.atlasCollections().filter(s=>s.id!==this.state.activeAtlasSheet);this.setState({atlasSheets:sheets},()=>{this.selectAtlasSheet(sheets[0].id);this.markDirty();});
+  }
+  atlasFilename(){
+    const sheet=this.atlasCollections().find(s=>s.id===this.state.activeAtlasSheet);return (this.state.projectName+'-'+sheet.name+(this.state.atlasScope==='partial'?'-selection':'')).replace(/[^\w.-]+/g,'_')+'-atlas';
   }
   atlasGeom(){
     const s = this.state, e = s.atlasExport, sp = e.spacing, pad = e.padding;
     if (!s.atlas.length) return { rects:[], w:1, h:1 };
-    const packed = packRects(s.atlas.map(a => ({ w:a.w+sp, h:a.h+sp })));
-    const rects = s.atlas.map((a,i) => ({ name:a.name, i, x:pad+packed.pos[i].x, y:pad+packed.pos[i].y, w:a.w, h:a.h }));
+    const items=s.atlas.map((a,i)=>({a,i})).filter(({a})=>s.atlasScope!=='partial'||s.metadataSelection.includes(a.id));
+    if(!items.length)return{rects:[],w:1,h:1};
+    const packed = packRects(items.map(({a}) => ({ w:a.w+sp, h:a.h+sp })));
+    const rects = items.map(({a,i},n) => ({ name:a.name, i, x:pad+packed.pos[n].x, y:pad+packed.pos[n].y, w:a.w, h:a.h }));
     let maxX=0, maxY=0; rects.forEach(r => { maxX=Math.max(maxX, r.x+r.w); maxY=Math.max(maxY, r.y+r.h); });
     return { rects, w:maxX+pad, h:maxY+pad };
   }
@@ -2026,7 +2057,8 @@ class Component extends React.Component {
     const c = cv.getContext('2d');
     if (!e.transparent){ c.fillStyle = '#15130f'; c.fillRect(0,0,g.w,g.h); }
     g.rects.forEach(r => this.blit(c, s.atlas[r.i].px, r.w, r.h, 1, r.x, r.y, null, null));
-    this.dl(cv, (s.projectName||'atlas') + '-atlas.png');
+    if(!g.rects.length){this.setState({hint:'Choose sprites to export.'});return;}
+    this.dl(cv,this.atlasFilename()+'.png');
     this.setState({ hint:'Exported atlas ' + g.w + '×' + g.h });
   }
   legacyAtlasMeta(){
@@ -2035,12 +2067,12 @@ class Component extends React.Component {
     g.rects.forEach(r => {
       const a = s.atlas[r.i];
       const entry = { x:r.x, y:r.y, w:r.w, h:r.h, kind:a.kind || 'decor' };
-      if (a.collision) entry.collision = true;
+      // Collision is authored in the receiving workshop.
       const tags = PixelStudioMetadata.tags(a.tags);
       if (tags.length) entry.tags = tags;
       sprites[r.name.toLowerCase().replace(/\s+/g,'_')] = entry;
     });
-    return { image:(s.projectName||'atlas') + '-atlas.png', width:g.w, height:g.h, count:s.atlas.length, padding:e.padding, spacing:e.spacing, sprites };
+    return { image:this.atlasFilename()+'.png', width:g.w, height:g.h, count:g.rects.length, padding:e.padding, spacing:e.spacing, sprites };
   }
   setAtlasField(patch){
     this.setState(v => { const atlas = v.atlas.slice(); const i = v.activeAtlas; if (!atlas[i]) return null; atlas[i] = {...atlas[i], ...patch}; return { atlas }; }, () => this.markDirty());
@@ -2068,7 +2100,8 @@ class Component extends React.Component {
         assets:s.tiles.map((a,i)=>({...a,rect:{x:t.padding+(i%g.c)*(s.tileW+t.spacing),y:t.padding+Math.floor(i/g.c)*(s.tileH+t.spacing),w:s.tileW,h:s.tileH}})),animations:this.animationSheets()});
     }
     const g=this.atlasGeom();
-    return PixelStudioMetadata.build({type:'atlas',image:(s.projectName||'atlas')+'-atlas.png',width:g.w,height:g.h,
+    if(!g.rects.length)throw Error('Choose sprites to export.');
+    return PixelStudioMetadata.build({type:'atlas',source:PixelStudioAtlas.source(s.projectId,s.projectName,this.atlasCollections().find(a=>a.id===s.activeAtlasSheet),s.atlasScope),image:this.atlasFilename()+'.png',width:g.w,height:g.h,
       assets:g.rects.map(r=>({...s.atlas[r.i],rect:{x:r.x,y:r.y,w:r.w,h:r.h}})),animations:this.animationSheets()});
   }
   downloadMetadata(type,legacy=false){
@@ -2077,7 +2110,7 @@ class Component extends React.Component {
       if(legacy)PixelStudioMetadata.assertLegacyNames(assets);
       const data=legacy?(type==='tiles'?this.legacyTileMeta():this.legacyAtlasMeta()):this.metadataDocument(type);
       const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-      a.href=url;a.download=this.state.projectName+'-'+(type==='tiles'?'tileset':'atlas')+(legacy?'-legacy':'')+'.json';
+      a.href=url;a.download=(type==='atlas'?this.atlasFilename():this.state.projectName+'-tileset')+(legacy?'-legacy':'')+'.json';
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
       this.setState({hint:'Exported '+(legacy?'legacy':'v2')+' metadata'});
     }catch(e){this.setState({hint:e.message});window.alert('Cannot export metadata: '+e.message);}
@@ -2085,6 +2118,7 @@ class Component extends React.Component {
   applyMetadata(metadata,bulk=false,workspace=this.state.workspace){
     const s=this.state,key=workspace==='tiles'?'tiles':'atlas', active=key==='tiles'?s.activeTile:s.activeAtlas;
     const targets=bulk?s[key].filter(a=>s.metadataSelection.includes(a.id)):[s[key][active]];
+    metadata={...metadata,enabled:{...metadata.enabled,collision:false,placement:false}};
     const errors=targets.flatMap(a=>PixelStudioMetadata.validate(metadata,key==='tiles'?s.tileW:a.w,key==='tiles'?s.tileH:a.h,s.animations.map(a=>a.id)).map(e=>a.name+': '+e));
     if(errors.length)return errors.join(' ');
     this.snap();
@@ -2340,7 +2374,7 @@ class Component extends React.Component {
       atlasTransparent: s.atlasExport.transparent,
       setAtlasTransparent: e => setAe({transparent:e.target.checked}),
       atlasSheetDim: ag.w + ' × ' + ag.h,
-      atlasSheetCount: s.atlas.length,
+      atlasSheetCount: this.atlasGeom().rects.length,
       exportAtlasSet: () => this.exportAtlasSet(),
       exportAtlasMeta: () => this.exportAtlasMeta(),
       atlasMetaNames: (() => {
@@ -3041,7 +3075,16 @@ class Component extends React.Component {
                       </div>
                     </div>
                   )}
-                  {R.isTiles && (
+                  {R.isAtlas && <div style={css("display:flex;flex-direction:column;gap:6px")}>
+              <label>Atlas sheet<select aria-label="Atlas sheet" value={this.state.activeAtlasSheet} onChange={e=>this.selectAtlasSheet(e.target.value)} style={css("width:100%;background:var(--bg2);color:var(--fg)")}>{this.atlasCollections().map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+              <div style={css("display:grid;grid-template-columns:1fr 1fr;gap:4px")}>
+              <button className="btn" onClick={()=>this.addAtlasSheet()}>+ Atlas sheet</button>
+              <button className="btn" onClick={()=>this.renameAtlasSheet()}>Rename sheet</button>
+              <button className="btn" onClick={()=>this.duplicateAtlasSheet()}>Duplicate sheet</button>
+              <button className="btn" disabled={this.state.atlasSheets.length<2} onClick={()=>this.removeAtlasSheet()}>Remove sheet</button>
+              </div>
+            </div>}
+            {R.isTiles && (
                     <div style={css("display:flex;flex-direction:column;gap:8px")}>
                       <div style={css("font-size:11px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap")}>{R.tileName}</div>
                       <div style={css("font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)")}>Repeat preview</div>
@@ -3532,7 +3575,7 @@ class Component extends React.Component {
                     </div>
                   </div>
                 </div>
-                <div style={css("padding:20px;display:flex;flex-direction:column;gap:16px")}>
+                <div style={css("padding:20px;display:flex;flex-direction:column;gap:16px")}><label>Export scope<select aria-label="Atlas export scope" value={this.state.atlasScope} onChange={e=>this.setState({atlasScope:e.target.value})}><option value="complete">Whole sheet</option><option value="partial">Selected sprites</option></select></label>
                   <div style={css("display:flex;align-items:center;justify-content:space-between;gap:12px")}>
                     <span style={css("font-size:12px;color:var(--dim)")}>Spacing</span>
                     <div style={css("display:flex;align-items:center;gap:9px")}>
