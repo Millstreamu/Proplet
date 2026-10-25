@@ -139,7 +139,15 @@ function MetadataEditor({asset, width, height, animations, apply, bulk, selected
           {key==='placement'&&field('Placement JSON',placement,setPlacement,'Pivot: normalized 0–1. Ground anchor: local pixels or null. Footprint: tile cells or null.')}
           {key==='tags'&&field('Tags',draft.tags.join(', '),v=>setDraft({...draft,tags:[...new Set(v.split(',').map(t=>t.trim()).filter(Boolean))]}))}
           {key==='properties'&&field('Custom properties JSON',properties,setProperties,'Example: {"damage":10,"interactable":true,"material":"wood"}')}
-          {key==='terrain'&&field('Terrain JSON',terrain,setTerrain,'Family and TL, TR, BR, BL corners.')}
+          {key==='terrain'&&<>
+            {(()=>{let t;try{t=JSON.parse(terrain);}catch{return null;}if(!t||typeof t!=='object'||Array.isArray(t))return null;const set=(key,value)=>setTerrain(JSON.stringify({...t,[key]:value}));return <>
+              <label>Terrain role<select aria-label="Terrain role" value={t.role||''} onChange={e=>set('role',e.target.value||undefined)} style={inputStyle}><option value="">Unspecified</option>{['base','transition','overlay'].map(role=><option key={role}>{role}</option>)}</select></label>
+              {field('Terrain family',t.family||'',v=>set('family',v))}
+              <label>Variation weight<input aria-label="Variation weight" type="number" min="0" step="any" value={t.weight??1} onChange={e=>set('weight',Number(e.target.value))} style={inputStyle}/></label>
+              {t.role==='overlay'&&<label>Overlay layer<input aria-label="Overlay layer" type="number" min="0" step="1" value={t.layer??0} onChange={e=>set('layer',Number(e.target.value))} style={inputStyle}/></label>}
+            </>;})()}
+            {field('Terrain JSON',terrain,setTerrain,'Corners: TL, TR, BR, BL. Optional pattern: {id, columns, rows, column, row}. Lower overlay layers draw first.')}
+          </>}
           {key==='animationId'&&<select aria-label="Linked animation" value={draft.animationId||''} onChange={e=>setDraft({...draft,animationId:e.target.value||null})} style={inputStyle}><option value="">Not specified</option>{animations.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>}
         </div>}
       </div>;
@@ -2288,7 +2296,7 @@ class Component extends React.Component {
     const ai = s.atlas[s.activeAtlas];
     const ag = s.atlasSheetOpen ? this.atlasGeom() : { w:0, h:0 };
     return {
-      workspaces: [['frames','Frames','Animation frames — sprite workflow'],['tiles','Tiles','Tile set — seamless uniform tiles'],['atlas','Atlas','Free-size sprites packed into one sheet']].map(([id,label,tip]) => ({
+      workspaces: [['frames','Frames','Animation frames — sprite workflow'],['tiles','Tiles','Terrain tiles — base patterns, corner transitions, and overlays'],['atlas','Atlas','Props and interactives — free-size sprites packed into one sheet']].map(([id,label,tip]) => ({
         label, tip, on:s.workspace===id,
         pick:()=>this.setState({ workspace:id, playing:false, selRect:null, tile:id==='tiles' ? true : (id==='atlas' ? false : s.tile), wrap:id==='atlas' ? false : s.wrap, hint:id==='atlas' ? 'Atlas — each sprite keeps its own size' : (id==='tiles' ? 'Tile set — the centre tile is editable' : 'Animation frames') }, ()=>this.fit())
       })),
@@ -3719,3 +3727,4 @@ root.render(React.createElement(Component, DEFAULTS));
 </script>
 </body>
 </html>
+

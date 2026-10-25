@@ -220,3 +220,12 @@ test('colour preview only adjusts the selected Atlas sprite and neutral Apply cr
  app.applyColourModify();assert.equal(app.state.atlas[0].px[0],'#ff0000');
  const history=app.undoStack.length;app.openColourModify();app.applyColourModify();assert.equal(app.undoStack.length,history);
 });
+
+
+test('terrain Tiles preserve structured metadata through save, reopen and export independently of props',()=>{
+ const app=editor();app.state.workspace='tiles';app.state.tileW=app.state.tileH=16;
+ app.state.tiles=Array.from({length:4},(_,i)=>({id:'q'+i,name:'Grass '+i,px:Array(256).fill('#718b50'),metadata:{category:'terrain',terrain:{family:'grass',role:'base',corners:[],weight:3,pattern:{id:'meadow',columns:2,rows:2,column:i%2,row:Math.floor(i/2)}}}}));
+ app.state.atlas=[{id:'prop',name:'Tree',w:16,h:32,px:Array(512).fill('#806040')}];const saved=app.serialize();app.loadProject(saved,true);
+ assert.equal(app.state.workspace,'tiles');assert.equal(app.state.atlas.length,1);assert.equal(app.metadataDocument('tiles').type,'tileset');assert.equal(app.metadataDocument('atlas').type,'atlas');assert.equal(app.metadataDocument('tiles').assets[3].terrain.pattern.row,1);
+ app.moveTile(0,3);assert.equal(app.metadataDocument('tiles').assets[3].id,'q0');assert.equal(app.metadataDocument('tiles').assets[3].terrain.pattern.column,0);
+});

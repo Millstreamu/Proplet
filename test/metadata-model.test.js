@@ -63,3 +63,20 @@ test('array and comma-separated tags are preserved in migrated v2 metadata',()=>
   a.metadata={tags:'forest, tree'};
   assert.deepEqual(metadata(a).tags,['forest','tree']);
 });
+
+
+test('generic terrain roles preserve weights, layers, corner labels and grouped pattern cells',()=>{
+ const tiles=Array.from({length:4},(_,i)=>({id:'q'+i,name:'Meadow',rect:{x:i*16,y:0,w:16,h:16},metadata:{category:'terrain',terrain:{family:'grass',role:'base',corners:[],weight:3,pattern:{id:'meadow',columns:2,rows:2,column:i%2,row:Math.floor(i/2)}}}}));
+ const doc=build({type:'tileset',image:'terrain.png',width:64,height:16,assets:tiles});assert.equal(doc.type,'tileset');assert.deepEqual(doc.assets[3].terrain.pattern,{id:'meadow',columns:2,rows:2,column:1,row:1});
+ assert.throws(()=>build({type:'tileset',assets:tiles.slice(1)}),/Incomplete terrain pattern/);
+ const dup=JSON.parse(JSON.stringify(tiles));dup[3].metadata.terrain.pattern.row=0;assert.throws(()=>build({type:'tileset',assets:dup}),/duplicate terrain pattern/);
+ const mismatch=JSON.parse(JSON.stringify(tiles));mismatch[3].metadata.terrain.weight=9;assert.throws(()=>build({type:'tileset',assets:mismatch}),/Inconsistent/);
+ for(const terrain of [{family:'grass',role:'overlay',corners:[],weight:2,layer:4},{family:'grass',role:'transition',corners:['grass','dirt','dirt','grass'],weight:1}]){
+  const a=asset('tile','Terrain');a.metadata={category:'terrain',terrain};const d=build({type:'tileset',assets:[a]});assert.deepEqual(d.assets[0].terrain,terrain);
+ }
+});
+test('invalid terrain role and variation data are blocked while disabled terrain stays optional',()=>{
+ for(const patch of [{role:'paint'},{weight:-1},{weight:Infinity},{layer:.5},{role:'transition',corners:[]},{pattern:{id:'p',columns:2,rows:2,column:2,row:0}}]){
+  const m=metadata({metadata:{category:'terrain',terrain:{family:'grass',role:'base',corners:[],...patch}}});assert.ok(validate(m,16,16).length);m.enabled.terrain=false;assert.deepEqual(validate(m,16,16),[]);
+ }
+});

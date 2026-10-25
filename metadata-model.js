@@ -37,6 +37,19 @@
     if(on.properties&&(!m.properties||Array.isArray(m.properties)||typeof m.properties!=='object'||!Object.values(m.properties).every(v=>typeof v==='string'||typeof v==='boolean'||(typeof v==='number'&&Number.isFinite(v)))))errors.push('Custom properties must be an object of text, finite numbers, or booleans.');
     if(on.animationId&&m.animationId&&!animationIds.includes(m.animationId))errors.push('Linked animation does not exist.');
     if(on.terrain&&(!m.terrain||typeof m.terrain.family!=='string'||!Array.isArray(m.terrain.corners)||![0,4].includes(m.terrain.corners.length)||!m.terrain.corners.every(c=>c===null||typeof c==='string')))errors.push('Terrain corners must be empty or contain TL, TR, BR, BL labels.');
+    if(on.terrain&&m.terrain){
+      const t=m.terrain;
+      if(t.role!==undefined&&!['base','transition','overlay'].includes(t.role))errors.push('Terrain role must be base, transition, or overlay.');
+      if(t.role&&(!t.family||!t.family.trim()))errors.push('Terrain family is required for a terrain role.');
+      if(t.weight!==undefined&&(!Number.isFinite(t.weight)||t.weight<0))errors.push('Terrain weight must be a non-negative finite number.');
+      if(t.layer!==undefined&&(!Number.isInteger(t.layer)||t.layer<0))errors.push('Terrain layer must be a non-negative integer.');
+      if(t.role==='transition'&&(t.corners?.length!==4||t.corners.some(c=>typeof c!=='string'||!c.trim())))errors.push('Transition tiles need four terrain corner labels.');
+      if(t.pattern!==undefined&&t.pattern!==null){
+        const p=t.pattern;
+        if(typeof p!=='object'||typeof p.id!=='string'||!p.id.trim()||!['columns','rows','column','row'].every(k=>Number.isInteger(p[k]))||p.columns<1||p.rows<1||p.column<0||p.column>=p.columns||p.row<0||p.row>=p.rows)errors.push('Pattern needs id, columns, rows, column, and row within its grid.');
+        if(t.role&&t.role!=='base')errors.push('Pattern groups belong to base terrain tiles.');
+      }
+    }
     return errors;
   }
   function build({type,image,width,height,assets,animations=[]}){
@@ -53,6 +66,16 @@
       if(m.enabled.placement){for(const key of ['pivot','groundAnchor','footprint'])if(m[key]!=null)entry[key]=m[key];}
       return entry;
     });
+    if(type==='tileset'){
+      const groups=new Map();
+      for(const e of entries){const t=e.terrain,p=t?.pattern;if(!p)continue;
+        const key=t.family+':'+p.id,g=groups.get(key)||{columns:p.columns,rows:p.rows,weight:t.weight??1,cells:new Set()};
+        const cell=p.column+','+p.row;
+        if(g.columns!==p.columns||g.rows!==p.rows||g.weight!==(t.weight??1)||g.cells.has(cell))errors.push('Inconsistent or duplicate terrain pattern cell: '+key);
+        g.cells.add(cell);groups.set(key,g);
+      }
+      for(const[key,g]of groups)if(g.cells.size!==g.columns*g.rows)errors.push('Incomplete terrain pattern: '+key);
+    }
     const linkedIds=new Set(entries.map(a=>a.animationId).filter(Boolean));
     for(const a of animations.filter(a=>linkedIds.has(a.id))){
       if(!Array.isArray(a.frames)||!a.frames.length||!a.frames.every(f=>Array.isArray(f.px)&&f.px.length===a.w*a.h&&Number.isFinite(f.dur)&&f.dur>0))errors.push('Invalid animation frames: '+a.name);
@@ -65,3 +88,4 @@
   function assertLegacyNames(assets){const names=new Set();for(const a of assets){const key=a.name.toLowerCase().replace(/\s+/g,'_');if(names.has(key))throw new Error('Legacy export would overwrite duplicate name: '+key);names.add(key);}}
   return {CATEGORIES,PRESETS,tags,metadata,validate,build,assertLegacyNames};
 });
+

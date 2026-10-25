@@ -65,3 +65,40 @@ Linked animations contain `id`, `name`, `w`, `h`, `frames` (`id`, `durationMs`, 
 Existing project metadata is migrated on inspection/export without losing the original fields: `decor` becomes category `decoration`; legacy `collision` kind enables solid collision; `animated` becomes category `prop` without inventing animation frames. Old tags and terrain corners remain available. Applied metadata is stored in project files.
 
 **JSON v2 preview & legacy export** in the export dialog offers the previous JSON structure. Legacy export is intentionally lossy for new fields (geometry, placement, custom properties, and animation links). It retains kind, collision boolean, tags, and terrain corners; its original format cannot represent every v2 inclusion choice. Normalized duplicate names block legacy export instead of silently discarding assets. Use v2 for new importers; keep legacy mode for existing consumers.
+
+
+## Terrain tiles and pattern groups
+
+Use **Tiles** for terrain and **Atlas** for props and interactives. Both use the
+same generic JSON v2 asset records; `type: "tileset"` identifies a tile export.
+Rectangles always identify actual PNG pixels, so games must use those rectangles
+rather than assume a fixed packing order. Export PNG at **1×** for matching JSON.
+
+The Terrain inspector exposes **role**, **family**, **variation weight**, and
+**overlay layer**. Advanced Terrain JSON supports:
+
+```json
+{"family":"grass","role":"base","corners":[],"weight":45,
+ "pattern":{"id":"meadow-01","columns":2,"rows":2,"column":0,"row":0}}
+```
+
+A pattern groups uniformly sized Tiles into one larger artwork. Its four 16px
+cells can describe a 32px pattern. Assign the same ID, grid dimensions, family,
+and weight to all its cells, with a distinct column/row for each cell. Reordering
+or changing sheet columns cannot break the group. Incomplete or duplicate
+pattern cells block export. Ungrouped base tiles are valid too.
+
+- `role: "base"`: opaque material artwork. Weight controls relative variation
+  selection; a pattern's weight applies once to the whole pattern.
+- `role: "transition"`: material join artwork with four `corners` in **TL, TR,
+  BR, BL** order. Example: `{"family":"grass","role":"transition",
+  "corners":["grass","grass","dirt","dirt"],"weight":1}`. An importer may
+  support weighted alternatives for the same corner arrangement.
+- `role: "overlay"`: transparent surface detail. Example:
+  `{"family":"grass","role":"overlay","corners":[],"weight":5,"layer":1}`.
+  Lower layers draw first. Family identifies the intended underlying material.
+
+Proplet validates descriptive metadata and pattern integrity. It does not impose
+movement size, supported material count, adjacency algorithms, overlay density,
+collision, encounter rules, or gameplay. Those are the receiving application's
+responsibility. Older `{family,corners}` terrain metadata remains valid.
