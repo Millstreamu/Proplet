@@ -54,3 +54,12 @@ test('blank category and empty optional values are not exported; enabled values 
   const entry=build({assets:[a]}).assets[0];
   assert.equal(entry.category,'Potion ingredient');assert.equal(entry.properties.rarity,'rare');
 });
+test('array and comma-separated tags are preserved in migrated v2 metadata',()=>{
+  const {tags}=require('../metadata-model.js');
+  assert.deepEqual(tags([' forest ','tree','tree',null]),['forest','tree']);
+  assert.deepEqual(tags('forest, tree, forest'),['forest','tree']);
+  const a=asset('tree','Tree');a.tags=['forest','tree'];
+  assert.deepEqual(build({assets:[a]}).assets[0].tags,['forest','tree']);
+  a.metadata={tags:'forest, tree'};
+  assert.deepEqual(metadata(a).tags,['forest','tree']);
+});

@@ -2,12 +2,17 @@
   'use strict';
   const CATEGORIES=['character','prop','decoration','ground','terrain','item','effect','ui'];
   const PRESETS={decoration:{category:'decoration',collision:{mode:'none',shape:{type:'bounds'}}},'solid prop':{category:'prop',collision:{mode:'solid',shape:{type:'bounds'}}},collectible:{category:'item',collision:{mode:'trigger',shape:{type:'bounds'}}},character:{category:'character',collision:{mode:'solid',shape:{type:'bounds'}}}};
+  function tags(value){
+    const items=Array.isArray(value)?value:typeof value==='string'?value.split(','):[];
+    return [...new Set(items.filter(v=>typeof v==='string').map(v=>v.trim()).filter(Boolean))];
+  }
   function metadata(asset){
     const old=asset.kind||'decor';
     const result = {category:old==='decor'?'decoration':['collision','animated'].includes(old)?'prop':old,
       collision:{mode:asset.collision||old==='collision'?'solid':'none',shape:{type:'bounds'}},
       pivot:{x:.5,y:1},groundAnchor:null,footprint:null,terrain:{family:'',corners:asset.corners||[]},
-      tags:typeof asset.tags==='string'?asset.tags.split(',').map(t=>t.trim()).filter(Boolean):[],properties:{},animationId:null,...asset.metadata};
+      tags:tags(asset.tags),properties:{},animationId:null,...asset.metadata};
+    result.tags=tags(result.tags);
     result.enabled={category:!!result.category,collision:result.collision?.mode!=='none',placement:!!asset.metadata?.pivot||!!result.groundAnchor||!!result.footprint,tags:result.tags.length>0,properties:Object.keys(result.properties||{}).length>0,terrain:result.category==='terrain',animationId:!!result.animationId,...asset.metadata?.enabled};
     return result;
   }
@@ -58,5 +63,5 @@
     return {format:'proplet-assets',version:2,type,image:{file:image,width,height},coordinates:{rectangles:'pixels; top-left origin',collision:'local pixels; top-left origin',groundAnchor:'local pixels',pivot:'normalized 0..1',footprint:'tile cells'},assets:entries,animations:animations.filter(a=>linked.has(a.id)).map(a=>({id:a.id,name:a.name,w:a.w,h:a.h,frames:a.frames.map(f=>({id:f.id,durationMs:f.dur,pixels:f.px})),clips:(a.tags||[]).map(t=>({name:t.name,start:t.start,end:t.end,mode:t.mode})),clipFrameIndices:'1-based inclusive'}))};
   }
   function assertLegacyNames(assets){const names=new Set();for(const a of assets){const key=a.name.toLowerCase().replace(/\s+/g,'_');if(names.has(key))throw new Error('Legacy export would overwrite duplicate name: '+key);names.add(key);}}
-  return {CATEGORIES,PRESETS,metadata,validate,build,assertLegacyNames};
+  return {CATEGORIES,PRESETS,tags,metadata,validate,build,assertLegacyNames};
 });

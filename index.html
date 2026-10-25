@@ -1837,7 +1837,7 @@ class Component extends React.Component {
       const entry = { index:i, kind: tl.kind || 'ground' };
       if ((tl.kind === 'terrain') && tl.corners && tl.corners.length === 4 && tl.corners.every(Boolean)) entry.corners = tl.corners.slice();
       if (tl.collision) entry.collision = true;
-      const tags = (tl.tags || '').split(',').map(x => x.trim()).filter(Boolean);
+      const tags = PixelStudioMetadata.tags(tl.tags);
       if (tags.length) entry.tags = tags;
       tiles[key] = entry;
     });
@@ -1969,7 +1969,7 @@ class Component extends React.Component {
       const a = s.atlas[r.i];
       const entry = { x:r.x, y:r.y, w:r.w, h:r.h, kind:a.kind || 'decor' };
       if (a.collision) entry.collision = true;
-      const tags = (a.tags||'').split(',').map(x => x.trim()).filter(Boolean);
+      const tags = PixelStudioMetadata.tags(a.tags);
       if (tags.length) entry.tags = tags;
       sprites[r.name.toLowerCase().replace(/\s+/g,'_')] = entry;
     });

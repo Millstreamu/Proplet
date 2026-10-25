@@ -171,3 +171,13 @@ test('metadata export inspectors target their own asset even when Frames workspa
   assert.ok(app.state.metadataCategories.includes('Potion ingredient'));
   assert.equal(app.state.tiles[0].metadata.enabled.collision,false);
 });
+test('Atlas and tileset export previews accept array tags from imported projects',()=>{
+  const app=editor();app.addAtlasItem();
+  app.state.atlas[0].tags=['forest','tree'];
+  app.state.tiles[0].tags=['ground','grass'];
+  const saved=JSON.parse(JSON.stringify(app.serialize()));app.loadProject(saved,true);
+  const legacy=app.legacyAtlasMeta();
+  assert.deepEqual(Array.from(Object.values(legacy.sprites)[0].tags),['forest','tree']);
+  assert.deepEqual(Array.from(Object.values(app.legacyTileMeta().tiles)[0].tags),['ground','grass']);
+  assert.deepEqual(Array.from(app.metadataDocument('atlas').assets[0].tags),['forest','tree']);
+});
