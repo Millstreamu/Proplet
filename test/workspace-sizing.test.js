@@ -198,3 +198,25 @@ test('hue shift affects all active animation frames or only the highlighted Atla
  app.shiftArtworkHue(-120);assert.equal(app.state.atlas[0].px[0],'#ff0000');assert.equal(app.state.atlas[1].px[0],'#0000ff');
  app.undo();assert.equal(app.state.atlas[1].px[0],'#ff0000');
 });
+test('live colour preview never changes saved data until Apply; Cancel and Undo restore exactly',()=>{
+ const app=editor();app.state.frames[0].px[0]='#ff0000';
+ const before=JSON.stringify(app.serialize());const history=app.undoStack.length;
+ app.openColourModify();app.previewColourModify({hue:120});
+ assert.equal(app.curPx()[0],'#00ff00');assert.equal(app.state.frames[0].px[0],'#ff0000');
+ assert.equal(JSON.stringify(app.serialize()),before);
+ app.previewColourModify({hue:0,saturation:0});assert.equal(app.curPx()[0],'#808080');
+ app.cancelColourModify();assert.equal(app.curPx()[0],'#ff0000');assert.equal(app.undoStack.length,history);
+ app.openColourModify();app.previewColourModify({hue:120});app.previewColourModify({hue:240});app.applyColourModify();
+ assert.equal(app.state.frames[0].px[0],'#0000ff');assert.equal(app.undoStack.length,history+1);
+ app.undo();assert.equal(app.state.frames[0].px[0],'#ff0000');
+ app.redo();assert.equal(app.state.frames[0].px[0],'#0000ff');
+});
+test('colour preview only adjusts the selected Atlas sprite and neutral Apply creates no undo entry',()=>{
+ const app=editor();app.addAtlasItem();app.addAtlasItem();
+ app.state.atlas[0].px[0]='#ff0000';app.state.atlas[1].px[0]='#ff0000';
+ app.openColourModify();app.previewColourModify({hue:120});
+ assert.equal(app.colourPreviewState().atlas[0].px[0],'#ff0000');
+ assert.equal(app.colourPreviewState().atlas[1].px[0],'#00ff00');
+ app.applyColourModify();assert.equal(app.state.atlas[0].px[0],'#ff0000');
+ const history=app.undoStack.length;app.openColourModify();app.applyColourModify();assert.equal(app.undoStack.length,history);
+});

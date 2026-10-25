@@ -22,6 +22,7 @@ a{color:var(--gold);text-decoration:none}
 a:hover{color:#f2d9a0}
 button{font-family:inherit;color:inherit}
 input{font-family:inherit}
+dialog::backdrop{background:rgba(0,0,0,.12)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 ::selection{background:rgba(225,173,102,.28)}
 .ic{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block}
@@ -279,7 +280,7 @@ class Component extends React.Component {
         { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
       ],
       activeTag:'t2', tagEdit:null,
-      scalePercent:50, hueDegrees:0, pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
+      scalePercent:50, hueDegrees:0, colourModify:null, pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
       tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
@@ -742,7 +743,7 @@ class Component extends React.Component {
   }
 
   paintOnion(c, ox, oy){
-    const s = this.state, W = s.w, H = s.h, cell = s.cell, o = s.onion;
+    const s = this.colourPreviewState(), W = s.w, H = s.h, cell = s.cell, o = s.onion;
     const n = s.frames.length;
     for (let k=o.prev;k>=1;k--){
       const i = s.active - k;
@@ -757,7 +758,7 @@ class Component extends React.Component {
   }
 
   paint(){
-    const s = this.state;
+    const s = this.colourPreviewState();
     const { frames, active, playing, previewIdx } = s;
     this.paintMain();
     if (s.workspace === 'tiles'){
@@ -889,7 +890,7 @@ class Component extends React.Component {
     }
   }
   curPx(){
-    const s = this.state;
+    const s = this.colourPreviewState();
     if (s.workspace === 'tiles'){ const t = s.tiles[s.activeTile]; return t ? t.px : s.frames[s.active].px; }
     if (s.workspace === 'atlas'){ const a = s.atlas[s.activeAtlas]; return a ? a.px : s.frames[s.active].px; }
     return s.frames[s.active].px;
@@ -1213,6 +1214,10 @@ class Component extends React.Component {
   }
 
   key(e){
+    if(this.state.colourModify){
+      if((e.metaKey||e.ctrlKey)&&['s','o','z','y'].includes(e.key.toLowerCase()))e.preventDefault();
+      return;
+    }
     const t = e.target;
     if (t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA')) return;
     const mod = e.metaKey || e.ctrlKey;
@@ -1548,7 +1553,7 @@ class Component extends React.Component {
     const sh = d.sheet || {};
     this.undoStack = []; this.redoStack = [];
     this.setState({
-      animations, activeAnimation:animation.id, metadataSelection:[],
+      animations, activeAnimation:animation.id, metadataSelection:[], colourModify:null,
       metadataCategories:[...new Set(PixelStudioMetadata.CATEGORIES.concat(d.metadataCategories||[],(d.tiles||[]).concat(d.atlas||[]).map(a=>PixelStudioMetadata.metadata(a).category)).filter(Boolean))],
       projectName: d.name || 'untitled', named:!!named, dirty:false, savedAt: named ? Date.now() : null,
       w, h, tileW:ts.w || w, tileH:ts.h || h,
@@ -1854,7 +1859,7 @@ class Component extends React.Component {
   paintTileRepeat(){
     const cv = this.previewRef.current;
     if (!cv) return;
-    const s = this.state, W = s.tileW, H = s.tileH, r = s.tilePreview;
+    const s = this.colourPreviewState(), W = s.tileW, H = s.tileH, r = s.tilePreview;
     cv.width = W*r; cv.height = H*r;
     const box = 92, dispScale = box / Math.max(W*r, H*r);
     cv.style.width = (W*r*dispScale)+'px'; cv.style.height = (H*r*dispScale)+'px';
@@ -1867,6 +1872,32 @@ class Component extends React.Component {
   }
 
   /* ── atlas (free-size decor sprites, packed into one sheet) ── */
+  colourPreviewState(){
+    const s=this.state,c=s.colourModify;
+    return c?{...s,[c.key]:c.preview}:s;
+  }
+  openColourModify(){
+    const s=this.state,key=s.workspace==='atlas'?'atlas':s.workspace==='tiles'?'tiles':'frames';
+    if(key==='atlas'&&!s.atlas.length){this.setState({hint:'Add a sprite before modifying colours.'});return;}
+    this.commitFloatingSelection();clearTimeout(this.timer);
+    const source=s[key].map(a=>({...a,px:a.px.slice()}));
+    this.setState({playing:false,colourModify:{key,index:s.activeAtlas,source,preview:source,hue:0,saturation:100,contrast:0,error:''}});
+  }
+  previewColourModify(patch){
+    const c=this.state.colourModify;if(!c)return;
+    const next={...c,...patch};
+    try{next.preview=c.source.map((item,i)=>c.key==='atlas'&&i!==c.index?item:{...item,px:PixelStudioScaling.modifyPixels(item.px,next)});next.error='';}
+    catch(e){next.error=e.message;}
+    this.setState({colourModify:next});
+  }
+  cancelColourModify(){this.setState({colourModify:null});}
+  applyColourModify(){
+    const c=this.state.colourModify;if(!c||c.error)return;
+    const changed=c.preview.some((item,i)=>item.px.some((p,j)=>p!==c.source[i].px[j]));
+    if(!changed){this.cancelColourModify();return;}
+    this.snap();
+    this.setState({[c.key]:c.preview,colourModify:null,hint:'Applied colour adjustments — Undo to revert'},()=>this.markDirty());
+  }
   shiftArtworkHue(degrees=this.state.hueDegrees){
     if(!Number.isFinite(degrees)||degrees%360===0)return;
     const s=this.state,key=s.workspace==='atlas'?'atlas':s.workspace==='tiles'?'tiles':'frames';
@@ -2831,10 +2862,7 @@ class Component extends React.Component {
                 <div style={css("font-size:10px;color:var(--dim);margin-top:5px")}>Result: {Math.round(this.dims().w*this.state.scalePercent/100)} × {Math.round(this.dims().h*this.state.scalePercent/100)} px · limit 256 × 256</div>
               </div>
               <div style={css("border-top:1px solid var(--line);padding-top:10px;margin-bottom:12px")}>
-                <div style={css("font-size:11px;color:var(--gold);margin-bottom:6px")}>Hue shift artwork · trial</div>
-                <div style={css("font-size:10px;color:var(--dim);margin-bottom:6px")}>{this.state.workspace==='atlas'?'Selected sprite':this.state.workspace==='tiles'?'All tiles in this set':'All frames in this animation sheet'} · rotates colours; keeps shading and transparency.</div>
-                <label style={css("display:flex;gap:7px;align-items:center;font-size:11px")}><input aria-label="Artwork hue shift" type="range" min="-180" max="180" step="1" value={this.state.hueDegrees} onChange={e=>this.setState({hueDegrees:Number(e.target.value)})} style={css("min-width:0;width:100%;accent-color:var(--gold)")}/><output>{this.state.hueDegrees}°</output></label>
-                <button className="btn" onClick={()=>this.shiftArtworkHue()} disabled={!this.state.hueDegrees}>Apply hue shift</button>
+                <button className="btn" onClick={()=>this.openColourModify()} style={css("width:100%;margin-bottom:12px")}>Colour modify</button>
               </div>
               <div style={css("font-size:10px;color:var(--dim);margin-bottom:5px")} title="Canvas background (view only)">Background · view only</div>
               <div style={css("display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden")}>
@@ -3152,6 +3180,21 @@ class Component extends React.Component {
           <span style={css("display:flex;align-items:center;gap:6px;color:var(--gold)")}><span style={css("width:6px;height:6px;border-radius:50%;background:var(--gold)")}></span>{R.autoStatus}</span>
           <span style={css("margin-left:auto;color:var(--gold);font-style:italic;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis")}>{R.hint}</span>
         </footer>
+
+        {this.state.colourModify && <dialog aria-labelledby="colour-modify-title" ref={el=>{if(el&&!el.open)el.showModal();}} onCancel={e=>{e.preventDefault();this.cancelColourModify();}} style={css("position:fixed;inset:100px 20px auto auto;margin:0;width:330px;max-width:calc(100vw - 24px);max-height:75vh;overflow:auto;background:var(--bg1);color:var(--fg);border:1px solid var(--gold);border-radius:7px;padding:18px;box-shadow:0 16px 48px rgba(0,0,0,.4)")}>
+          <h2 id="colour-modify-title" style={css("font-size:19px;margin:0 0 10px")}>Colour modify</h2>
+          <p style={css("font-size:11px;color:var(--dim);line-height:1.5")}>Live preview · {this.state.colourModify.key==='atlas'?'selected sprite':this.state.colourModify.key==='tiles'?'all tiles in this set':'all frames in this animation sheet'}. Apply keeps changes; Cancel restores the original.</p>
+          {[['hue','Hue',-180,180,'°'],['saturation','Saturation',0,200,'%'],['contrast','Contrast',-100,100,'%']].map(([key,label,min,max,unit])=><label key={key} style={css("display:block;margin:15px 0;font-size:12px")}>
+            <span style={css("display:flex;justify-content:space-between")}>{label}<output>{this.state.colourModify[key]}{unit}</output></span>
+            <input autoFocus={key==='hue'} aria-label={label} type="range" min={min} max={max} step="1" value={this.state.colourModify[key]} onChange={e=>this.previewColourModify({[key]:Number(e.target.value)})} style={css("width:100%;accent-color:var(--gold)")}/>
+          </label>)}
+          {this.state.colourModify.error&&<div role="alert">{this.state.colourModify.error}</div>}
+          <div style={css("display:flex;gap:8px;justify-content:flex-end;margin-top:18px")}>
+            <button className="btn" onClick={()=>this.previewColourModify({hue:0,saturation:100,contrast:0})}>Reset</button>
+            <button className="btn" onClick={()=>this.cancelColourModify()}>Cancel</button>
+            <button className="btn btn-primary" disabled={!!this.state.colourModify.error} onClick={()=>this.applyColourModify()}>Apply</button>
+          </div>
+        </dialog>}
 
         {R.menuOpen && (
           <div onClick={R.closeMenu} onContextMenu={R.closeMenu} style={css("position:fixed;inset:0;z-index:60")}>

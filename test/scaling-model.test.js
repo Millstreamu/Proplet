@@ -21,3 +21,12 @@ test('hue rotation changes the palette while keeping shading, greys and transpar
  assert.deepEqual(huePixels(['#f00',null],360),['#f00',null]);
  assert.throws(()=>huePixels(['#ff0000'],NaN));
 });
+test('colour modify has neutral defaults, desaturates, adjusts contrast and preserves alpha',()=>{
+ const {modifyPixels}=require('../scaling-model.js');
+ const px=['#ff0000','#808080',null,'#ff000080'];
+ assert.deepEqual(modifyPixels(px),px);
+ assert.deepEqual(modifyPixels(px,{saturation:0}),['#808080','#808080',null,'#80808080']);
+ assert.deepEqual(modifyPixels(['#123456',null],{contrast:-100}),['#808080',null]);
+ assert.deepEqual(modifyPixels(['#ff0000'],{hue:120}),['#00ff00']);
+ assert.throws(()=>modifyPixels(px,{saturation:NaN}));
+});

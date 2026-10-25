@@ -38,5 +38,25 @@
     const colours=new Map();
     return pixels.map(c=>{if(!colours.has(c))colours.set(c,hueColour(c,degrees));return colours.get(c);});
   }
-  return {scale,asset,hueColour,huePixels};
+  function modifyPixels(pixels,{hue=0,saturation=100,contrast=0}={}){
+    if(![hue,saturation,contrast].every(Number.isFinite)||saturation<0||saturation>200||contrast< -100||contrast>100)throw new Error('Invalid colour adjustment.');
+    const colours=new Map();
+    return pixels.map(colour=>{
+      if(colour==null)return colour;
+      if(colours.has(colour))return colours.get(colour);
+      if(hue%360===0&&saturation===100&&contrast===0)return colour;
+      let value=hueColour(colour,hue).slice(1);
+      if(value.length===3)value=value.split('').map(c=>c+c).join('');
+      if(!/^[a-f\d]{6}([a-f\d]{2})?$/i.test(value))throw new Error('Unsupported pixel colour: '+colour);
+      const rgb=[0,2,4].map(i=>parseInt(value.slice(i,i+2),16)/255);
+      const light=(Math.max(...rgb)+Math.min(...rgb))/2;
+      const gain=(100+contrast)/100;
+      const out='#'+rgb.map(c=>{
+        const saturated=Math.max(0,Math.min(1,light+(c-light)*saturation/100));
+        return Math.round(Math.max(0,Math.min(1,(saturated-.5)*gain+.5))*255).toString(16).padStart(2,'0');
+      }).join('')+value.slice(6);
+      colours.set(colour,out);return out;
+    });
+  }
+  return {scale,asset,hueColour,huePixels,modifyPixels};
 });
