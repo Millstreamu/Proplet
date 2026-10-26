@@ -11,7 +11,7 @@ function editor() {
   class State {
     setState(update, done) { Object.assign(this.state, typeof update === 'function' ? update(this.state) : update); if (done) done(); }
   }
-  const ctx = {clearTimeout, PixelStudioScaling:require('../scaling-model.js'), React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js'), PixelStudioMetadata:require('../metadata-model.js')};
+  const ctx = {clearTimeout, PixelStudioAtlas:require('../atlas-model.js'), PixelStudioScaling:require('../scaling-model.js'), React:{Component:State, createRef:()=>({current:null})}, PixelStudioPaint:require('../paint-model.js'), PixelStudioMetadata:require('../metadata-model.js')};
   vm.runInNewContext(compiled, ctx);
   const app = new ctx.Editor({});
   app.fit = () => {};
@@ -127,18 +127,10 @@ test('asset metadata survives project saves and duplicate assets receive separat
   app.state.atlas[1].metadata.collision.mode='trigger';
   assert.equal(app.state.atlas[0].metadata.collision.mode,'solid');
 });
-test('bulk metadata validates every selected size before changing any asset',()=>{
-  const app=editor();app.addAtlasItem();app.addAtlasItem();
-  app.state.atlas[1].w=4;app.state.atlas[1].h=4;
-  app.state.metadataSelection=app.state.atlas.map(a=>a.id);
-  const m=require('../metadata-model.js').metadata({});
-  m.enabled.collision=true;
-  m.collision={mode:'solid',shape:{type:'rectangle',x:0,y:0,w:8,h:8}};
-  assert.match(app.applyMetadata(m,true),/must fit/);
-  assert.ok(app.state.atlas.every(a=>!a.metadata));
-  m.collision.shape={type:'bounds'};
-  assert.equal(app.applyMetadata(m,true),'');
-  assert.ok(app.state.atlas.every(a=>a.metadata.collision.mode==='solid'));
+test('bulk art metadata disables legacy geometry and exports no collision or anchors',()=>{
+ const app=editor();app.addAtlasItem();app.addAtlasItem();app.state.atlas[1].w=4;app.state.atlas[1].h=4;app.state.metadataSelection=app.state.atlas.map(a=>a.id);
+ const m=require('../metadata-model.js').metadata({});m.enabled.collision=true;m.collision={mode:'solid',shape:{type:'rectangle',x:0,y:0,w:8,h:8}};
+ assert.equal(app.applyMetadata(m,true),'');assert.ok(app.state.atlas.every(a=>a.metadata.enabled.collision===false));assert.ok(app.metadataDocument('atlas').assets.every(a=>!('collision' in a)&&!('pivot' in a)));
 });
 test('PNG target follows the highlighted workspace asset and explicit export tab',()=>{
   const app=editor();
@@ -219,4 +211,25 @@ test('colour preview only adjusts the selected Atlas sprite and neutral Apply cr
  assert.equal(app.colourPreviewState().atlas[1].px[0],'#00ff00');
  app.applyColourModify();assert.equal(app.state.atlas[0].px[0],'#ff0000');
  const history=app.undoStack.length;app.openColourModify();app.applyColourModify();assert.equal(app.undoStack.length,history);
+});
+
+
+test('terrain Tiles preserve structured metadata through save, reopen and export independently of props',()=>{
+ const app=editor();app.state.workspace='tiles';app.state.tileW=app.state.tileH=16;
+ app.state.tiles=Array.from({length:4},(_,i)=>({id:'q'+i,name:'Grass '+i,px:Array(256).fill('#718b50'),metadata:{category:'terrain',terrain:{family:'grass',role:'base',corners:[],weight:3,pattern:{id:'meadow',columns:2,rows:2,column:i%2,row:Math.floor(i/2)}}}}));
+ app.state.atlas=[{id:'prop',name:'Tree',w:16,h:32,px:Array(512).fill('#806040')}];const saved=app.serialize();app.loadProject(saved,true);
+ assert.equal(app.state.workspace,'tiles');assert.equal(app.state.atlas.length,1);assert.equal(app.metadataDocument('tiles').type,'tileset');assert.equal(app.metadataDocument('atlas').type,'atlas');assert.equal(app.metadataDocument('tiles').assets[3].terrain.pattern.row,1);
+ app.moveTile(0,3);assert.equal(app.metadataDocument('tiles').assets[3].id,'q0');assert.equal(app.metadataDocument('tiles').assets[3].terrain.pattern.column,0);
+});
+
+test('Atlas sheets isolate art, persist IDs, migrate old projects and duplicate independently',()=>{
+ const app=editor();app.addAtlasItem();app.state.atlas[0].name='Oak';app.state.atlas[0].px[0]='#abcdef';app.renameAtlasSheet('Village');const village=app.state.activeAtlasSheet,oak=app.state.atlas[0].id,project=app.state.projectId;
+ app.addAtlasSheet('Woodland');const woods=app.state.activeAtlasSheet;assert.notEqual(village,woods);assert.equal(app.state.atlas.length,1);app.state.atlas[0].name='Pine';app.selectAtlasSheet(village);assert.equal(app.state.atlas[0].id,oak);assert.equal(app.state.atlas[0].px[0],'#abcdef');
+ const saved=app.serialize();assert.equal(saved.atlasSheets.length,2);app.loadProject(saved,true);assert.equal(app.state.projectId,project);assert.equal(app.metadataDocument('atlas').source.sheet.name,'Village');assert.equal(app.metadataDocument('atlas').source.sheet.id,village);assert.equal(app.metadataDocument('atlas').source.scope,'complete');
+ app.duplicateAtlasSheet();assert.notEqual(app.state.activeAtlasSheet,village);assert.notEqual(app.state.atlas[0].id,oak);app.state.atlas[0].px[0]='#123456';app.selectAtlasSheet(village);assert.equal(app.state.atlas[0].px[0],'#abcdef');
+ app.removeAtlasSheet();assert.equal(app.state.atlasSheets.length,2);app.undo();assert.equal(app.atlasCollections().length,3);assert.equal(app.state.activeAtlasSheet,village);
+ app.loadProject({name:'Old',w:16,h:16,frames:[{px:Array(256).fill(null)}],atlas:[{id:'old-sprite',name:'Old sprite',w:16,h:16,px:Array(256).fill(null)}]},true);assert.equal(app.state.atlasSheets.length,1);assert.equal(app.state.atlas[0].id,'old-sprite');const migrated=app.serialize();app.loadProject(migrated,true);assert.equal(app.state.projectId,migrated.projectId);
+});
+test('partial sheet export retains identity and only selected sprites; empty selections are blocked',()=>{
+ const app=editor();app.addAtlasItem();app.addAtlasItem();const whole=app.metadataDocument('atlas');app.state.atlasScope='partial';assert.throws(()=>app.metadataDocument('atlas'),/Choose sprites/);app.state.metadataSelection=[app.state.atlas[1].id];const selected=app.metadataDocument('atlas');assert.equal(selected.assets.length,1);assert.equal(selected.assets[0].id,app.state.atlas[1].id);assert.equal(selected.source.sheet.id,whole.source.sheet.id);assert.equal(selected.source.scope,'partial');assert.match(selected.image.file,/selection-atlas.png$/);
 });

@@ -21,3 +21,9 @@ python3 -m http.server 8000
 ```
 
 See [Asset export](EXPORT-FORMAT.md) for selected PNG export, metadata editing, JSON v2, and legacy export compatibility.
+
+
+Atlas supports independent named sheets. Save retains every sheet; export uses
+only the active sheet, with stable project/sheet/sprite IDs and whole/partial
+scope. Proplet exports art metadata; anchors and collision belong in Workshop.
+See [EXPORT-FORMAT.md](EXPORT-FORMAT.md) and [CHANGELOG.md](CHANGELOG.md).
