@@ -87,3 +87,9 @@ Proplet validates descriptive metadata and pattern integrity. It does not impose
 movement size, supported material count, adjacency algorithms, overlay density,
 collision, encounter rules, or gameplay. Those are the receiving application's
 responsibility. Older `{family,corners}` terrain metadata remains valid.
+
+## Import an Atlas into an existing project
+
+Choose **File → Import Atlas (append)…**. Select a `.pixelproj` to bring in sprites from all its Atlas sheets in sheet order, or select an exported atlas JSON (v2 or legacy) and its matching atlas PNG. PNG alone cannot identify the individual sprite rectangles.
+
+Imported sprites are appended in file order after the existing contents of the current Atlas sheet; existing art, tiles, and animation sheets stay intact. Names may repeat. Each imported sprite and linked animation receives a fresh ID; animation references are remapped. Linked animation sheets and custom categories are carried over as needed. The first appended sprite is selected. Import is a single undoable edit, and invalid files leave the project unchanged.
