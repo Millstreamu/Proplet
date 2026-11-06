@@ -44,6 +44,7 @@ dialog::backdrop{background:rgba(0,0,0,.12)}
 <script src="paint-model.js"></script>
 <script src="metadata-model.js"></script>
 <script src="atlas-model.js"></script>
+<script src="atlas-import-model.js"></script>
 <script src="scaling-model.js"></script>
 </head>
 <body>
@@ -287,7 +288,7 @@ class Component extends React.Component {
         { id:'t3', name:'Attack', start:9, end:12, mode:'Forward', color:'#c2417a' }
       ],
       activeTag:'t2', tagEdit:null,
-      scalePercent:50, hueDegrees:0, colourModify:null, pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
+      atlasImport:null, scalePercent:50, hueDegrees:0, colourModify:null, pngScale:1, metadataSelection:[], metadataCategories:PixelStudioMetadata.CATEGORIES.slice(),
       tileW:w, tileH:h, tiles:this.demoTiles(w,h), activeTile:0, wrap:false, tilePreview:3,
       terrains:['grass','dirt','water'], terrainDraft:'',
       ref:null, refOn:true, refOpacity:45, refScale:100, refX:0, refY:0, refMove:false,
@@ -838,7 +839,7 @@ class Component extends React.Component {
     this.redoStack = [];
     this.markDirty();
   }
-  cap(){ return { atlasSheets:JSON.parse(JSON.stringify(this.atlasCollections())),activeAtlasSheet:this.state.activeAtlasSheet,atlasExport:{...this.state.atlasExport}, frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, tileW:this.state.tileW, tileH:this.state.tileH, selRect:this.state.selRect }; }
+  cap(){ return { animations:this.animationSheets(), activeAnimation:this.state.activeAnimation, metadataCategories:this.state.metadataCategories.slice(), atlasSheets:JSON.parse(JSON.stringify(this.atlasCollections())),activeAtlasSheet:this.state.activeAtlasSheet,atlasExport:{...this.state.atlasExport}, frames:this.state.frames.map(f=>({...f, px:f.px.slice()})), tiles:this.state.tiles.map(t=>({...t, px:t.px.slice()})), atlas:this.state.atlas.map(a=>({...a, px:a.px.slice()})), activeTile:this.state.activeTile, activeAtlas:this.state.activeAtlas, active:this.state.active, w:this.state.w, h:this.state.h, tileW:this.state.tileW, tileH:this.state.tileH, selRect:this.state.selRect }; }
   undo(){ if (!this.undoStack.length) return; this.commitFloatingSelection(); this.redoStack.push(this.cap()); this.setState(this.undoStack.pop()); }
   redo(){ if (!this.redoStack.length) return; this.commitFloatingSelection(); this.undoStack.push(this.cap()); this.setState(this.redoStack.pop()); }
 
@@ -1221,6 +1222,7 @@ class Component extends React.Component {
   }
 
   key(e){
+    if(this.state.atlasImport){return;}
     if(this.state.colourModify){
       if((e.metaKey||e.ctrlKey)&&['s','o','z','y'].includes(e.key.toLowerCase()))e.preventDefault();
       return;
@@ -1392,6 +1394,28 @@ class Component extends React.Component {
     });
     this.dl(cv, 'sprite-sheet-'+g.w+'x'+g.h+'.png');
     this.setState({hint:'Exported sheet '+g.w+'×'+g.h});
+  }
+  appendAtlasImport(prepared){
+    const ids=new Map(prepared.animations.map(a=>[a.id,assetId('animation')]));
+    const animations=prepared.animations.map(a=>({...a,id:ids.get(a.id),frames:a.frames.map(f=>({...f,id:assetId('frame')}))}));
+    const sprites=prepared.sprites.map(a=>{const copy=JSON.parse(JSON.stringify(a));copy.id=assetId('sprite');if(copy.metadata?.animationId)copy.metadata.animationId=ids.get(copy.metadata.animationId);return copy;});
+    this.commitFloatingSelection();clearTimeout(this.timer);this.snap();
+    const first=this.state.atlas.length;
+    this.setState(s=>({atlas:s.atlas.concat(sprites),animations:this.animationSheets().concat(animations),activeAtlas:first,workspace:'atlas',tile:false,playing:false,selRect:null,clip:null,atlasImport:null,
+      metadataCategories:[...new Set(s.metadataCategories.concat(prepared.categories,sprites.map(a=>a.metadata?.category)).filter(c=>typeof c==='string'&&c))],hint:'Added '+sprites.length+' sprites to the end of the Atlas'}),()=>{this.fit();this.markDirty();});
+  }
+  async importAtlasFiles(){
+    const selection=this.state.atlasImport;if(!selection?.json)return;
+    this.setState({atlasImport:{...selection,busy:true,error:''}});
+    try{
+      const data=JSON.parse(await selection.json.text());let image;
+      if(data.format!=='pixelproj'){
+        if(!selection.png)throw new Error('Choose the matching atlas PNG as well as the JSON file.');
+        const bitmap=await createImageBitmap(selection.png);
+        try{const cv=document.createElement('canvas');cv.width=bitmap.width;cv.height=bitmap.height;const c=cv.getContext('2d');c.drawImage(bitmap,0,0);image={width:cv.width,height:cv.height,pixels:c.getImageData(0,0,cv.width,cv.height).data};}finally{bitmap.close();}
+      }
+      this.appendAtlasImport(PixelStudioAtlasImport.prepare(data,image));
+    }catch(e){this.setState({atlasImport:{...selection,busy:false,error:e.message}});}
   }
   onImport(e){
     const file = e.target.files && e.target.files[0];
@@ -2156,6 +2180,7 @@ class Component extends React.Component {
       { label:'Open Project…', note:'⌘O', click:close(()=>this.projRef.current && this.projRef.current.click()) },
       { label:'Save', note:'⌘S', click:close(()=>this.saveProject(false)) },
       { label:'Save As…', note:'⇧⌘S', click:close(()=>this.saveProject(true)) },
+      { label:'Import Atlas (append)…', note:'', click:close(()=>this.setState({atlasImport:{json:null,png:null,busy:false,error:''}})) },
       { label:'Import Image…', note:'', click:close(()=>this.fileRef.current && this.fileRef.current.click()) },
       { label:'Paste sprite code…', note:'', click:close(()=>this.setState({ pasteOpen:true, pasteMsg:'' })) },
       { label:'Export selected PNG', note:s.pngScale+'×', click:close(()=>this.exportPng()) },
@@ -3231,6 +3256,15 @@ class Component extends React.Component {
           <span style={css("display:flex;align-items:center;gap:6px;color:var(--gold)")}><span style={css("width:6px;height:6px;border-radius:50%;background:var(--gold)")}></span>{R.autoStatus}</span>
           <span style={css("margin-left:auto;color:var(--gold);font-style:italic;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis")}>{R.hint}</span>
         </footer>
+
+        {this.state.atlasImport && <dialog aria-labelledby="atlas-import-title" ref={el=>{if(el&&!el.open)el.showModal();}} onCancel={e=>{e.preventDefault();if(!this.state.atlasImport.busy)this.setState({atlasImport:null});}} style={css("width:430px;max-width:90vw;background:var(--bg1);color:var(--fg);border:1px solid var(--gold);border-radius:6px;padding:20px")}>
+          <h2 id="atlas-import-title">Import Atlas</h2>
+          <p style={css("font-size:12px;line-height:1.5;color:var(--dim)")}>Add sprites to the end of the current Atlas. Choose a Proplet project, or an exported atlas JSON and its matching PNG. Existing sprites stay unchanged.</p>
+          <label style={css("display:block;margin:14px 0;font-size:12px")}>Project or atlas JSON<input aria-label="Atlas project or JSON" type="file" accept=".pixelproj,.json,application/json" disabled={this.state.atlasImport.busy} onChange={e=>{const file=e.target.files[0];this.setState(s=>({atlasImport:{...s.atlasImport,json:file,error:''}}));}}/></label>
+          <label style={css("display:block;margin:14px 0;font-size:12px")}>Atlas PNG (not needed for projects)<input aria-label="Atlas PNG" type="file" accept="image/png" disabled={this.state.atlasImport.busy} onChange={e=>{const file=e.target.files[0];this.setState(s=>({atlasImport:{...s.atlasImport,png:file,error:''}}));}}/></label>
+          {this.state.atlasImport.error&&<div role="alert" style={css("color:#f09586;font-size:12px")}>{this.state.atlasImport.error}</div>}
+          <div style={css("display:flex;justify-content:flex-end;gap:8px;margin-top:20px")}><button className="btn" disabled={this.state.atlasImport.busy} onClick={()=>this.setState({atlasImport:null})}>Cancel</button><button className="btn btn-primary" disabled={!this.state.atlasImport.json||this.state.atlasImport.busy} onClick={()=>this.importAtlasFiles()}>{this.state.atlasImport.busy?'Importing…':'Append sprites'}</button></div>
+        </dialog>}
 
         {this.state.colourModify && <dialog aria-labelledby="colour-modify-title" ref={el=>{if(el&&!el.open)el.showModal();}} onCancel={e=>{e.preventDefault();this.cancelColourModify();}} style={css("position:fixed;inset:100px 20px auto auto;margin:0;width:330px;max-width:calc(100vw - 24px);max-height:75vh;overflow:auto;background:var(--bg1);color:var(--fg);border:1px solid var(--gold);border-radius:7px;padding:18px;box-shadow:0 16px 48px rgba(0,0,0,.4)")}>
           <h2 id="colour-modify-title" style={css("font-size:19px;margin:0 0 10px")}>Colour modify</h2>

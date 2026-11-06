@@ -233,3 +233,24 @@ test('Atlas sheets isolate art, persist IDs, migrate old projects and duplicate 
 test('partial sheet export retains identity and only selected sprites; empty selections are blocked',()=>{
  const app=editor();app.addAtlasItem();app.addAtlasItem();const whole=app.metadataDocument('atlas');app.state.atlasScope='partial';assert.throws(()=>app.metadataDocument('atlas'),/Choose sprites/);app.state.metadataSelection=[app.state.atlas[1].id];const selected=app.metadataDocument('atlas');assert.equal(selected.assets.length,1);assert.equal(selected.assets[0].id,app.state.atlas[1].id);assert.equal(selected.source.sheet.id,whole.source.sheet.id);assert.equal(selected.source.scope,'partial');assert.match(selected.image.file,/selection-atlas.png$/);
 });
+
+test('Atlas append preserves existing sprites, remaps linked animations and can be undone/redone',()=>{
+ const app=editor();app.addAtlasItem();const before=JSON.stringify(app.state.atlas);const sheets=app.state.animations.length;
+ const metadata=require('../metadata-model.js').metadata({kind:'decor'});metadata.animationId='incoming';metadata.enabled.animationId=true;
+ app.appendAtlasImport({sprites:[{id:app.state.atlas[0].id,name:'Added',w:1,h:1,px:['#ff0000'],metadata}],animations:[{id:'incoming',name:'Imported clip',w:1,h:1,frames:[{id:'f',px:['#ff0000'],dur:100}],tags:[]}],categories:['custom']});
+ assert.equal(JSON.stringify(app.state.atlas.slice(0,1)),before);assert.equal(app.state.atlas[1].name,'Added');
+ assert.notEqual(app.state.atlas[1].id,app.state.atlas[0].id);
+ assert.equal(app.state.atlas[1].metadata.animationId,app.state.animations.at(-1).id);
+ app.undo();assert.equal(JSON.stringify(app.state.atlas),before);assert.equal(app.state.animations.length,sheets);
+ app.redo();assert.equal(app.state.atlas.length,2);
+});
+test('Atlas append changes only the current named sheet and survives project save/reopen',()=>{
+ const app=editor();app.addAtlasItem();const first=app.state.activeAtlasSheet;
+ const original=JSON.stringify(app.state.atlas);app.addAtlasSheet('Target');
+ const target=app.state.activeAtlasSheet;const count=app.state.atlas.length;
+ app.appendAtlasImport({sprites:[{name:'Appended',w:1,h:1,px:['#ff0000']}],animations:[],categories:[]});
+ assert.equal(app.state.atlas[count].name,'Appended');
+ app.selectAtlasSheet(first);assert.equal(JSON.stringify(app.state.atlas),original);
+ app.selectAtlasSheet(target);assert.equal(app.state.atlas[count].name,'Appended');
+ const saved=app.serialize();app.loadProject(saved,true);assert.equal(app.state.atlas[count].name,'Appended');
+});
